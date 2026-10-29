@@ -8,6 +8,14 @@
   const CURRENT = { food: 11900, move: 5250, exercise: 2000, steps: 5600 };
   let flash = "";
   let state;
+  let syncStatus = "loading";
+  let syncETag = null;
+  let lastSharedState = null;
+  let syncTimer = null;
+  let syncInFlight = false;
+  let syncQueued = false;
+  let appReady = false;
+  const SYNC_URL = "/api/data";
 
   function copy(x) { return JSON.parse(JSON.stringify(x)); }
   function localISO(d) {
@@ -152,7 +160,7 @@
     });
     return result;
   }
-  function shortDay(s) { return fmt(s, { weekday: "short" }); }
+  function shortDay(s) { return ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][dateObj(s).getDay()]; }
   function dayStrip(metric, start, selected, compactSteps) {
     const strip = node("div", "day-strip");
     strip.setAttribute("aria-label", metric + " entries by day");
@@ -162,7 +170,7 @@
       const b = button("", cls, "select-date");
       b.dataset.date = day;
       b.setAttribute("aria-label", shortDay(day) + ", " + (value === null ? "not logged" : number(value) + (metric === "steps" ? " steps" : " calories")));
-      b.appendChild(node("span", "dow", shortDay(day).slice(0, 1)));
+      b.appendChild(node("span", "dow", shortDay(day)));
       let shown = value === null ? "—" : number(value);
       if (compactSteps && value !== null && value >= 10000) shown = (value / 1000).toFixed(0) + "k";
       b.appendChild(node("span", "day-value", shown));
@@ -517,7 +525,7 @@
     row.append(button("Download backup", "secondary-button", "export-backup"), button("Restore backup", "secondary-button", "open-restore"));
     const restore = document.createElement("input"); restore.type = "file"; restore.accept = "application/json"; restore.id = "restoreFile"; restore.className = "hidden";
     row.appendChild(restore); historyCard.appendChild(row);
-    historyCard.appendChild(node("p", "hint", "Daily logs, targets, weight, and measurements are stored in this browser. Keep a backup before switching devices."));
+    historyCard.appendChild(node("p", "hint", "Workbook history is included automatically. New logs, targets, weigh-ins, and measurements sync through Netlify when online; a local copy keeps the app usable offline."));
     historyCard.appendChild(node("hr", "section-divider"));
     const historyHead = node("div", "card-head");
     const left = node("div");
@@ -545,11 +553,218 @@
     const pages = { today: renderToday, review: renderReview, weight: renderWeight, measurements: renderMeasurements, more: renderMore };
     (pages[state.ui.view] || renderToday)();
     const status = document.getElementById("saveStatus");
-    if (status) status.textContent = "Saved on this device";
+    if (status) status.textContent = syncLabel();
+  }
+  function syncLabel() {
+    if (!supportsRemoteSync()) return "Saved on this device";
+    return ({ loading: "Connecting…", syncing: "Syncing…", synced: "Synced across devices", offline: "Saved here · will sync when online", error: "Saved here · sync unavailable" })[syncStatus] || "Saved on this device";
+  }
+  function updateSyncLabel() {
+    const badge = document.getElementById("saveStatus");
+    if (badge) badge.textContent = syncLabel();
+    const footer = document.getElementById("syncFooter");
+    if (footer) footer.textContent = supportsRemoteSync() ? "Changes sync across devices when online." : "Entries save on this device only.";
+  }
+  function supportsRemoteSync() {
+    return location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  }
+  function sharedState() {
+    const settings = copy(state.settings);
+    delete settings.reminder;
+    return {
+      schemaVersion: 1,
+      logs: copy(state.logs),
+      weighIns: copy(state.weighIns),
+      measurements: copy(state.measurements),
+      settings
+    };
+  }
+  function mergeHistoryIntoState(target, incoming) {
+    if (!incoming || incoming.source !== "MASTER_SPREADSHEET.xlsx") return false;
+    let changed = false;
+    Object.entries(incoming.dailyLogDays || {}).forEach(function (pair) {
+      const date = pair[0], imported = pair[1], current = target.logs[date];
+      if (!current) { target.logs[date] = copy(imported); changed = true; return; }
+      Object.keys(imported).forEach(function (key) {
+        if (key === "sessions") {
+          if (!(current.sessions || []).length && !current.noWorkout && imported.sessions && imported.sessions.length) { current.sessions = copy(imported.sessions); changed = true; }
+        } else if (key === "exerciseLogged" && imported[key] === true && current[key] !== true && !current.noWorkout) { current[key] = true; changed = true; }
+        else if (current[key] === null || current[key] === undefined) { current[key] = imported[key]; changed = true; }
+      });
+    });
+    Object.entries(incoming.weighIns || {}).forEach(function (pair) {
+      const date = pair[0], imported = pair[1], current = target.weighIns[date] || {};
+      Object.keys(imported).forEach(function (key) {
+        if (current[key] === null || current[key] === undefined) { current[key] = imported[key]; changed = true; }
+      });
+      target.weighIns[date] = current;
+    });
+    target.settings.importSummary = incoming.importSummary || target.settings.importSummary || {};
+    target.settings.importedFrom = incoming.source;
+    return changed;
+  }
+  function recordKeysChanged(before, after) {
+    const oldMap = before || {}, newMap = after || {};
+    return Array.from(new Set(Object.keys(oldMap).concat(Object.keys(newMap)))).filter(function (key) {
+      return JSON.stringify(oldMap[key]) !== JSON.stringify(newMap[key]);
+    });
+  }
+  function mapById(items) {
+    const result = {};
+    (items || []).forEach(function (item) { result[String(item.id)] = item; });
+    return result;
+  }
+  function addDirtyChanges(before, after) {
+    const sync = state._sync || (state._sync = { dirtyKeys: { logs: [], weighIns: [], measurements: [], settings: false } });
+    const dirty = sync.dirtyKeys || (sync.dirtyKeys = { logs: [], weighIns: [], measurements: [], settings: false });
+    ["logs", "weighIns"].forEach(function (section) {
+      const keys = recordKeysChanged(before && before[section], after[section]);
+      dirty[section] = Array.from(new Set((dirty[section] || []).concat(keys)));
+    });
+    const measureChanges = recordKeysChanged(mapById(before && before.measurements), mapById(after.measurements));
+    dirty.measurements = Array.from(new Set((dirty.measurements || []).concat(measureChanges)));
+    if (JSON.stringify(before && before.settings) !== JSON.stringify(after.settings)) dirty.settings = true;
+  }
+  function hasDirtyChanges() {
+    const d = state._sync && state._sync.dirtyKeys;
+    return !!d && (d.settings || ["logs", "weighIns", "measurements"].some(function (key) { return (d[key] || []).length > 0; }));
+  }
+  function clearDirtyChanges() {
+    state._sync = state._sync || {};
+    state._sync.dirtyKeys = { logs: [], weighIns: [], measurements: [], settings: false };
+  }
+  function mergeConcurrent(remote, local) {
+    const merged = copy(remote || local);
+    const dirty = state._sync && state._sync.dirtyKeys || {};
+    ["logs", "weighIns"].forEach(function (section) {
+      merged[section] = Object.assign({}, (remote && remote[section]) || {});
+      (dirty[section] || []).forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call((local && local[section]) || {}, key)) merged[section][key] = copy(local[section][key]);
+        else delete merged[section][key];
+      });
+    });
+    const mergedMeasures = mapById((remote && remote.measurements) || []);
+    const localMeasures = mapById((local && local.measurements) || []);
+    (dirty.measurements || []).forEach(function (id) {
+      if (Object.prototype.hasOwnProperty.call(localMeasures, id)) mergedMeasures[id] = copy(localMeasures[id]);
+      else delete mergedMeasures[id];
+    });
+    merged.measurements = Object.values(mergedMeasures);
+    if (dirty.settings) merged.settings = copy(local.settings);
+    return merged;
+  }
+  function applySharedState(shared) {
+    const localUi = state.ui || {};
+    const localReminder = state.settings && state.settings.reminder;
+    state = Object.assign({}, copy(shared), {
+      ui: localUi,
+      settings: Object.assign({}, copy(shared.settings || {}), { reminder: localReminder || { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null } }),
+      _sync: state._sync || {}
+    });
+    state.logs = state.logs || {};
+    state.weighIns = state.weighIns || {};
+    state.measurements = state.measurements || [];
+    state.settings.targets = state.settings.targets || [{ effectiveFrom: "2026-01-05", ...BASE }, { effectiveFrom: "2026-11-02", ...CURRENT }];
+    state.settings.dailyOverrides = state.settings.dailyOverrides || {};
+    state.settings.logPoints = state.settings.logPoints || [];
+  }
+  function persistLocal() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+    catch { const status = document.getElementById("saveStatus"); if (status) status.textContent = "Could not save"; return false; }
+  }
+  function scheduleRemoteSync() {
+    if (!supportsRemoteSync() || !appReady) return;
+    clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(function () { syncNow(false); }, 700);
+  }
+  async function putSharedState(shared) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const headers = { "Content-Type": "application/json" };
+      if (syncETag) headers["If-Match"] = syncETag;
+      const response = await fetch(SYNC_URL, { method: "PUT", headers, body: JSON.stringify({ state: shared }) });
+      const payload = await response.json().catch(function () { return {}; });
+      if (response.status === 409 && payload.state) {
+        const currentLocal = sharedState();
+        const merged = mergeConcurrent(payload.state, currentLocal);
+        syncETag = payload.etag || null;
+        state._sync.etag = syncETag;
+        applySharedState(merged);
+        shared = sharedState();
+        continue;
+      }
+      if (!response.ok) throw new Error(payload.error || "Could not sync tracker data.");
+      syncETag = payload.etag || syncETag;
+      state._sync.etag = syncETag;
+      const savedShared = sharedState();
+      if (JSON.stringify(savedShared) === JSON.stringify(shared)) {
+        state._sync.dirty = false;
+        clearDirtyChanges();
+        lastSharedState = copy(savedShared);
+        syncStatus = "synced";
+        updateSyncLabel();
+      } else {
+        state._sync.dirty = true;
+        scheduleRemoteSync();
+      }
+      persistLocal();
+      return;
+    }
+    throw new Error("Tracker data changed on another device. Try syncing again.");
+  }
+  async function syncNow(refreshView) {
+    if (!supportsRemoteSync()) { syncStatus = "local"; updateSyncLabel(); return; }
+    if (syncInFlight) { syncQueued = true; return; }
+    syncInFlight = true;
+    syncStatus = navigator.onLine ? "syncing" : "offline";
+    updateSyncLabel();
+    try {
+      const response = await fetch(SYNC_URL, { cache: "no-store" });
+      if (!response.ok) throw new Error("Shared storage is not available.");
+      const payload = await response.json();
+      if (payload.state) {
+        if (state._sync && state._sync.dirty && hasDirtyChanges()) {
+          const merged = mergeConcurrent(payload.state, sharedState());
+          syncETag = payload.etag || null;
+          state._sync.etag = syncETag;
+          applySharedState(merged);
+          await putSharedState(sharedState());
+        } else {
+          syncETag = payload.etag || null;
+          applySharedState(payload.state);
+          state._sync.etag = syncETag;
+          state._sync.dirty = false;
+          clearDirtyChanges();
+          lastSharedState = copy(sharedState());
+          persistLocal();
+          syncStatus = "synced";
+          updateSyncLabel();
+          if (refreshView) render();
+        }
+      } else {
+        state._sync = state._sync || {};
+        state._sync.dirty = true;
+        if (!hasDirtyChanges()) {
+          state._sync.dirtyKeys = { logs: Object.keys(state.logs), weighIns: Object.keys(state.weighIns), measurements: Object.keys(mapById(state.measurements)), settings: true };
+        }
+        await putSharedState(sharedState());
+      }
+    } catch {
+      syncStatus = navigator.onLine ? "error" : "offline";
+      updateSyncLabel();
+    } finally {
+      syncInFlight = false;
+      if (syncQueued) { syncQueued = false; syncNow(true); }
+    }
   }
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch { const s = document.getElementById("saveStatus"); if (s) s.textContent = "Could not save"; }
+    const after = sharedState();
+    if (lastSharedState) addDirtyChanges(lastSharedState, after);
+    lastSharedState = copy(after);
+    state._sync = state._sync || { dirty: false, dirtyKeys: { logs: [], weighIns: [], measurements: [], settings: false } };
+    if (hasDirtyChanges()) state._sync.dirty = true;
+    persistLocal();
+    if (state._sync.dirty) scheduleRemoteSync();
+    updateSyncLabel();
   }
   function notify(message) {
     flash = message; render();
@@ -810,11 +1025,13 @@
         measurementMonth: monthString(today()), historyMonth: monthString(today()), overrideDate: today() }
     };
   }
+  let hadLocalState = false;
   try {
     const saved = localStorage.getItem(KEY);
+    hadLocalState = !!saved;
     state = saved ? JSON.parse(saved) : initialState();
   } catch { state = initialState(); }
-  if (!state || state.schemaVersion !== 1) state = initialState();
+  if (!state || state.schemaVersion !== 1) { state = initialState(); hadLocalState = false; }
   state.logs = state.logs || {};
   state.weighIns = state.weighIns || {};
   state.measurements = state.measurements || [];
@@ -832,8 +1049,29 @@
   state.ui.measurementMonth = state.ui.measurementMonth || monthString(today());
   state.ui.historyMonth = state.ui.historyMonth || monthString(today());
   state.ui.overrideDate = state.ui.overrideDate || today();
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+  const priorShared = sharedState();
+  const historyAdded = mergeHistoryIntoState(state, seed);
+  state._sync = state._sync || { etag: null, dirty: false, dirtyKeys: { logs: [], weighIns: [], measurements: [], settings: false } };
+  state._sync.dirtyKeys = state._sync.dirtyKeys || { logs: [], weighIns: [], measurements: [], settings: false };
+  if (hadLocalState && !state._sync.etag) {
+    state._sync.dirtyKeys = { logs: Object.keys(state.logs), weighIns: Object.keys(state.weighIns), measurements: Object.keys(mapById(state.measurements)), settings: true };
+    state._sync.dirty = true;
+  }
+  if (historyAdded) {
+    addDirtyChanges(priorShared, sharedState());
+    state._sync.dirty = true;
+  }
+  lastSharedState = copy(sharedState());
+  persistLocal();
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("./sw.js").catch(function () {});
+  render();
+  appReady = true;
+  if (supportsRemoteSync()) syncNow(false);
+  else { syncStatus = "local"; updateSyncLabel(); }
+  window.addEventListener("online", function () { syncNow(true); });
+  window.addEventListener("focus", function () { syncNow(true); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) syncNow(true); });
+  if (supportsRemoteSync()) window.setInterval(function () { if (!document.hidden) syncNow(true); }, 45000);
   navButtons.forEach(function (b) { b.addEventListener("click", function () { state.ui.view = b.dataset.view; flash = ""; save(); render(); }); });
   document.querySelectorAll(".app-footer [data-view]").forEach(function (b) { b.addEventListener("click", function () { state.ui.view = b.dataset.view; flash = ""; save(); render(); }); });
   render();

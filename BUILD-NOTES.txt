@@ -1,6 +1,12 @@
-Daily Tracker - build notes
+Daily Tracker - Version 2 build notes
 
-App assets served by Netlify: public/
-Server functions: netlify/functions/
-Private migration data: history-import.json (outside public/)
-Local records: browser localStorage; use JSON backups for transfer.
+Static app assets: public/
+Netlify Functions: netlify/functions/
+Shared tracker data: Netlify Blobs store daily-health-tracker / shared-state
+Workbook history source: history-import.json (project root)
+Workbook history seed for automatic local and first-deploy display: public/seed-history.js
+Local cache: browser localStorage; JSON backup available in More.
+Cross-device data endpoint: /api/data (no sign-in, per user preference).
+Device reminder endpoint: /api/reminders (separate authenticated setup key).
+
+The /api/data handler uses conditional ETag writes. The browser syncs on startup, save, return to the app, and every 45 seconds while visible. Device-specific reminder credentials and screen selection are excluded from shared data.

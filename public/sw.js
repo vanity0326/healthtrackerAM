@@ -1,4 +1,4 @@
-const CACHE = "daily-tracker-shell-v1";
+const CACHE = "daily-tracker-shell-v2";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./seed-history.js", "./manifest.webmanifest", "./icons/tracker.svg"];
 
 self.addEventListener("install", function (event) {
@@ -46,3 +46,4 @@ self.addEventListener("notificationclick", function (event) {
     return clients.openWindow("./index.html");
   }));
 });
+

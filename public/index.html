@@ -21,7 +21,7 @@
         <p class="subhead">A simple place to log, notice patterns, and adjust your plan.</p>
       </div>
       <div class="header-meta">
-        <span id="saveStatus" class="save-status">Saved on this device</span>
+        <span id="saveStatus" class="save-status">Loading tracker…</span>
         <span id="logPoints" class="points-pill">0 log points</span>
       </div>
     </header>
@@ -34,10 +34,13 @@
     </nav>
     <main id="view-content" tabindex="-1"></main>
     <footer class="app-footer">
-      <span>Your entries stay in this browser.</span>
+      <span id="syncFooter">Opening your tracker…</span>
       <button type="button" class="text-button" data-view="more">Backup and settings</button>
     </footer>
   </div>
+  <script src="./seed-history.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
+
+

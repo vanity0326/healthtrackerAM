@@ -1,6 +1,6 @@
 # Daily Tracker
 
-A private, local-first daily log and weekly review app. It is designed to sit alongside the separate exercise planner.
+A daily log and weekly review app with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
@@ -14,13 +14,13 @@ A private, local-first daily log and weekly review app. It is designed to sit al
 - Weekly targets that carry forward until changed, with optional one-week and one-day overrides.
 - One logging point per day, with no points removed for missed days.
 - JSON backup and restore.
+- Spreadsheet history appears automatically on first open.
+- Cross-device sync through a Netlify Function and Netlify Blobs, with conditional writes and conflict merging.
 - Installable PWA shell and device push reminder functions.
 
 ## Workbook history import
 
-The history-import.json file is intentionally outside public/. It contains personal health records and is not included in the files Netlify publishes. After opening the app, go to **More → Import workbook history** and select this file from your computer.
-
-It brings in 178 dates with at least one daily value and 43 Monday weigh-ins, from January 5 through October 26, 2026. Missing cells remain blank. Historical exercise calorie totals are kept as dated daily totals because the workbook did not contain individual workout sessions. The spreadsheet did not contain monthly circumference measurements.
+The workbook history is included in the app and appears automatically. It brings in 178 dates with at least one daily value and 43 weigh-ins, from January 5 through October 26, 2026. The original import file remains outside `public/`; a generated browser seed provides the history for local file mode and initializes the shared Netlify store. Missing cells remain blank. Historical exercise calorie totals are kept as dated daily totals because the workbook did not contain individual workout sessions. The spreadsheet did not contain monthly circumference measurements.
 
 Existing app data takes priority if a date already has an entry. Imported records do not add logging points.
 
@@ -35,9 +35,13 @@ The workbook targets remain attached to their historical weeks. The revised exer
 
 A target change made in the app starts the following Monday. One-week changes revert to the prior scheduled targets; one-day overrides change only that date's daily guide.
 
-## Local data and backups
+## Shared data and backups
 
-Daily logs, weight readings, target history, and monthly measurements stay in the current browser's local storage. They are not uploaded or synced to another device. Use **More → Download backup** before changing browsers or devices. The optional reminder service stores only the push subscription, local reminder time zone/time, last-log date, and reminder state; it does not store food, activity, steps, weight, or measurements.
+Daily logs, weight readings, target history, monthly measurements, and logging points are saved locally first, then synced to the Netlify Function at `/api/data`, which stores one shared tracker record in a site-wide Netlify Blobs store. Other devices load that shared record on startup, when returning to the app, and periodically while it is open. A local copy remains available offline and syncs when the connection returns. Reminder credentials and per-device reminder settings are not synced.
+
+On first use, the shared store is initialized with the included workbook history. Existing Version 1 browser data is merged into the shared store when that browser first connects. Each device should open the same deployed Netlify address. Use **More → Download backup** for a separate backup.
+
+The data endpoint has no sign-in, as requested. Anyone who can access the deployed app can read or change the shared tracker data. The function uses ETags to reject stale writes and the app merges changes by record before retrying; if two devices edit the same record at nearly the same time, the most recent retry takes precedence. Netlify Blobs conditional write behavior is documented by Netlify.
 
 ## Run locally
 
@@ -46,7 +50,7 @@ Daily logs, weight readings, target history, and monthly measurements stay in th
 3. Run npm run dev.
 4. Open the local address shown by Netlify CLI.
 
-The ordinary log, review, backup, and import screens work locally. Device reminders require a deployed HTTPS site and server configuration.
+Local file mode shows the bundled history and keeps data only in that browser. The bundled history seed is included in the public app files. Cross-device sync and device reminders require the HTTPS Netlify deployment; reminders also require their server configuration.
 
 ## Configure device reminders
 
@@ -58,5 +62,5 @@ The reminders are scheduled server-side so they can arrive when the app is close
 4. Set REMINDER_API_KEY to a long random secret. For example, generate one locally with Node: node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))".
 5. Deploy the site, install it on the device, then open **More → Device reminders** and enter the same REMINDER_API_KEY to enable push notifications.
 
-The reminder scheduler checks hourly in UTC and sends at the selected local hour. Netlify scheduled functions are used for that background check. Do not place history-import.json inside public/ or configure Netlify to publish the project root.
+The reminder scheduler checks hourly in UTC and sends at the selected local hour. Netlify scheduled functions are used for that background check. Keep the project publish directory set to `public` and functions directory set to `netlify/functions`. The included `netlify.toml` already sets both.
 
