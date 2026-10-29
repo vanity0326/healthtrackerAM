@@ -1,0 +1,14 @@
+{
+  "name": "Daily Tracker",
+  "short_name": "Daily Tracker",
+  "description": "A personal daily logging and weekly review app.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FBF3D9",
+  "theme_color": "#FBF3D9",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "./icons/tracker.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

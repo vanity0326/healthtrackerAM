@@ -1,0 +1,6 @@
+Daily Tracker - build notes
+
+App assets served by Netlify: public/
+Server functions: netlify/functions/
+Private migration data: history-import.json (outside public/)
+Local records: browser localStorage; use JSON backups for transfer.
