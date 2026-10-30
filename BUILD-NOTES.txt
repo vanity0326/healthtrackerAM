@@ -1,4 +1,4 @@
-Daily Tracker - Version 2 build notes
+Daily Tracker - Version 2.1.0 build notes
 
 Static app assets: public/
 Netlify Functions: netlify/functions/
@@ -9,4 +9,4 @@ Local cache: browser localStorage; JSON backup available in More.
 Cross-device data endpoint: /api/data (no sign-in, per user preference).
 Device reminder endpoint: /api/reminders (separate authenticated setup key).
 
-The /api/data handler uses conditional ETag writes. The browser syncs on startup, save, return to the app, and every 45 seconds while visible. Device-specific reminder credentials and screen selection are excluded from shared data.
+Version 2.1.0 removes the redundant Move, Exercise, and Steps weekly summary cards from Daily Log, adds editable measurement types with monthly trend cards, and displays the app version in the header. The /api/data handler uses conditional ETag writes. The browser syncs on startup, save, return to the app, and every 45 seconds while visible. Device-specific reminder credentials and screen selection are excluded from shared data.

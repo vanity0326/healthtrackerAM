@@ -280,18 +280,6 @@
     workoutCard.appendChild(node("p", "hint", "Move is the all-day Active Calories total. Exercise is workout-only and kept separate."));
     app.appendChild(workoutCard);
 
-    [["Move", "move", "All-day Active Calories", target.move, "cal", false],
-     ["Exercise", "exercise", "Workout Active Calories", target.exercise, "cal", false],
-     ["Steps", "steps", "Week-to-date daily average", target.steps, "steps", true]].forEach(function (item) {
-      const data = totals[item[1]];
-      const actual = item[1] === "steps" ? data.average : data.sum;
-      const c = card(item[0], item[2]);
-      const value = actual === null ? "No entries yet" : number(actual) + (item[1] === "steps" ? " avg/day" : " " + item[4]);
-      c.appendChild(node("div", "weekly-total", value + " · target " + number(item[3]) + (item[1] === "steps" ? " avg/day" : " per week")));
-      c.appendChild(node("p", "hint", data.count + " day" + (data.count === 1 ? "" : "s") + " with entries"));
-      c.appendChild(dayStrip(item[1], weekStart, date, item[5]));
-      app.appendChild(c);
-    });
     const pointsCard = card("Logging reward", "One point for the first saved entry each day. Missed days never erase points.");
     pointsCard.appendChild(node("div", "big-value", String(state.settings.logPoints.length) + " points"));
     app.appendChild(pointsCard);
@@ -407,28 +395,130 @@
     const p = month.split("-").map(Number);
     return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(p[0], p[1] - 1, 1, 12));
   }
+  function registeredMeasurementTypes() {
+    const types = new Map();
+    (state.settings.measurementTypes || []).forEach(function (type) {
+      if (type && type.name) types.set(type.name.toLowerCase(), { name: type.name, unit: type.unit || "in" });
+    });
+    state.measurements.forEach(function (item) {
+      if (item && item.name && !types.has(item.name.toLowerCase())) types.set(item.name.toLowerCase(), { name: item.name, unit: item.unit || "in" });
+    });
+    return Array.from(types.values()).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+  function measurementTrend(container, type, month) {
+    const records = state.measurements.filter(function (item) {
+      return item.name.toLowerCase() === type.name.toLowerCase() && item.month <= month;
+    }).sort(function (a, b) { return a.month.localeCompare(b.month); }).slice(-6);
+    if (!records.length) {
+      container.appendChild(empty("No entries yet. Your first monthly reading will start the trend."));
+      return;
+    }
+    const latest = records[records.length - 1];
+    const previous = records.length > 1 ? records[records.length - 2] : null;
+    const summary = node("div", "measurement-current");
+    summary.appendChild(node("strong", "", number(latest.value, 1) + " " + (latest.unit || type.unit)));
+    summary.appendChild(node("span", "", monthLabel(latest.month)));
+    container.appendChild(summary);
+    if (previous) {
+      const delta = latest.value - previous.value;
+      const prefix = delta > 0 ? "+" : "";
+      container.appendChild(node("p", "measurement-change", prefix + number(delta, 1) + " " + (latest.unit || type.unit) + " since " + monthLabel(previous.month)));
+      const svgNS = "http://www.w3.org/2000/svg";
+      const chart = document.createElementNS(svgNS, "svg");
+      chart.setAttribute("viewBox", "0 0 300 56");
+      chart.setAttribute("role", "img");
+      chart.setAttribute("aria-label", type.name + " monthly trend in " + (latest.unit || type.unit));
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = type.name + " monthly measurements";
+      chart.appendChild(title);
+      const values = records.map(function (item) { return item.value; });
+      const low = Math.min.apply(null, values), high = Math.max.apply(null, values);
+      const span = high - low || 1;
+      const coords = records.map(function (item, index) {
+        return { x: 8 + index * (284 / Math.max(1, records.length - 1)), y: 43 - ((item.value - low) / span) * 32, item: item };
+      });
+      const baseline = document.createElementNS(svgNS, "path");
+      baseline.setAttribute("class", "measurement-baseline");
+      baseline.setAttribute("d", "M4 47H296");
+      chart.appendChild(baseline);
+      const line = document.createElementNS(svgNS, "path");
+      line.setAttribute("class", "measurement-line");
+      line.setAttribute("d", coords.map(function (point, index) { return (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1); }).join(" "));
+      chart.appendChild(line);
+      coords.forEach(function (point, index) {
+        const dot = document.createElementNS(svgNS, "circle");
+        dot.setAttribute("cx", point.x.toFixed(1)); dot.setAttribute("cy", point.y.toFixed(1));
+        dot.setAttribute("r", index === coords.length - 1 ? "4" : "3");
+        chart.appendChild(dot);
+      });
+      container.appendChild(chart);
+      const labels = node("div", "measurement-months");
+      labels.style.gridTemplateColumns = "repeat(" + records.length + ", minmax(0, 1fr))";
+      records.forEach(function (item) { labels.appendChild(node("span", "", monthLabel(item.month).split(" ")[0])); });
+      container.appendChild(labels);
+    } else {
+      container.appendChild(node("p", "hint", "One reading recorded · add another month to see a trend."));
+    }
+  }
+  function renderMeasurementTypeForm() {
+    const f = form("measurementTypeForm", "card");
+    f.append(node("h3", "", "Add a measurement type"), node("p", "card-intro", "Name any measurement you want to follow and choose its unit."));
+    const grid = node("div", "measure-grid");
+    grid.append(field("Name", "name", "", { type: "text", maxlength: 40, placeholder: "e.g., waist" }));
+    grid.append(field("Unit", "unit", "in", { type: "text", maxlength: 12, placeholder: "in, cm, etc." }));
+    const actions = node("div", "button-row");
+    const add = button("Add type", "primary-button"); add.type = "submit";
+    actions.append(add, button("Cancel", "text-button", "cancel-measurement-type"));
+    f.append(grid, actions);
+    return f;
+  }
+  function renderMeasurementEntryForm(month, types) {
+    if (!types.length) return null;
+    const name = state.ui.measurementType && types.some(function (item) { return item.name === state.ui.measurementType; }) ? state.ui.measurementType : types[0].name;
+    const type = types.find(function (item) { return item.name === name; }) || types[0];
+    const f = form("measurementForm", "card");
+    f.append(node("h3", "", "Log a monthly measurement"), node("p", "card-intro", "Add one reading for the selected month. You can update it later."));
+    const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "month"; hidden.value = month;
+    f.appendChild(hidden);
+    const grid = node("div", "measure-grid");
+    grid.append(field("Measurement type", "name", name, { select: true, id: "measurementTypeSelect", options: types.map(function (item) { return { label: item.name, value: item.name }; }) }));
+    grid.append(field("Value", "value", "", { step: "0.1", placeholder: "Monthly reading" }));
+    grid.appendChild(node("span", "measurement-unit-hint", "Unit: " + type.unit));
+    const add = button("Save reading", "primary-button"); add.type = "submit";
+    const actions = node("div", "button-row");
+    actions.append(add, button("Cancel", "text-button", "cancel-measurement-entry"));
+    f.append(grid, actions);
+    return f;
+  }
   function renderMeasurements() {
     const month = state.ui.measurementMonth || monthString(today());
-    app.appendChild(titleBlock("Monthly measurements", "Body measurements are kept separate from daily logging.", monthPicker("measurementMonth", month, "Month")));
+    const types = registeredMeasurementTypes();
+    const extra = node("div", "date-row");
+    extra.appendChild(monthPicker("measurementMonth", month, "Month to log"));
+    app.appendChild(titleBlock("Measurements", "Monthly check-ins · follow the measurements that matter to you.", extra));
     addFlash(app);
-    const add = form("measurementForm");
-    add.append(node("h3", "", "Add a measurement"), node("p", "card-intro", "Choose the measurement types you want to follow. Add one at a time."));
-    const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "month"; hidden.value = month;
-    add.appendChild(hidden);
-    const grid = node("div", "measure-grid");
-    grid.append(field("Measurement", "name", "", { type: "text", maxlength: 40, placeholder: "e.g., waist" }));
-    grid.append(field("Value", "value", "", { step: "0.1" }));
-    grid.append(field("Unit", "unit", "in", { select: true, options: [{ label: "in", value: "in" }, { label: "cm", value: "cm" }] }));
-    const addButton = button("Add", "primary-button"); addButton.type = "submit";
-    grid.appendChild(addButton); add.appendChild(grid); app.appendChild(add);
-    const list = card(monthLabel(month), "No monthly body measurements were present in the spreadsheet.");
-    const entries = state.measurements.filter(function (m) { return m.month === month; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
-    if (!entries.length) list.appendChild(empty("No body measurements recorded this month."));
-    entries.forEach(function (item) {
-      const row = node("div", "list-row");
-      row.append(node("strong", "", item.name), node("span", "small-value", number(item.value, 1) + " " + item.unit));
-      const remove = button("Remove", "text-button", "remove-measurement"); remove.dataset.id = item.id;
-      row.appendChild(remove); list.appendChild(row);
+    const controls = node("div", "button-row");
+    controls.appendChild(button("＋ Add measurement type", "secondary-button", "open-measurement-type"));
+    app.appendChild(controls);
+    if (state.ui.measurementTypeFormOpen) app.appendChild(renderMeasurementTypeForm());
+    if (state.ui.measurementFormOpen) app.appendChild(renderMeasurementEntryForm(month, types));
+    if (!types.length) {
+      app.appendChild(card("Your measurement cards", "Add any type and unit you want; it will get its own monthly card and progress trend."));
+      app.lastChild.appendChild(empty("No types added yet. Try waist, hips, arm, thigh, or any measurement you prefer."));
+      return;
+    }
+    const list = node("div", "measurement-cards");
+    types.forEach(function (type) {
+      const c = card(type.name, "Monthly measurement · " + type.unit);
+      const trend = node("div", "measurement-trend");
+      measurementTrend(trend, type, month);
+      c.appendChild(trend);
+      const action = node("div", "button-row");
+      const log = button("Log " + monthLabel(month), "secondary-button", "log-measurement");
+      log.dataset.name = type.name;
+      action.appendChild(log);
+      c.appendChild(action);
+      list.appendChild(c);
     });
     app.appendChild(list);
   }
@@ -666,6 +756,7 @@
     state.measurements = state.measurements || [];
     state.settings.targets = state.settings.targets || [{ effectiveFrom: "2026-01-05", ...BASE }, { effectiveFrom: "2026-11-02", ...CURRENT }];
     state.settings.dailyOverrides = state.settings.dailyOverrides || {};
+    state.settings.measurementTypes = state.settings.measurementTypes || [];
     state.settings.logPoints = state.settings.logPoints || [];
   }
   function persistLocal() {
@@ -831,12 +922,27 @@
     if (Object.keys(record).length) state.weighIns[date] = record; else delete state.weighIns[date];
     save(); render(); notify("Monday weigh-in saved.");
   }
+  function submitMeasurementType(f) {
+    const name = f.elements.name.value.trim(), unit = f.elements.unit.value.trim();
+    if (!name || !unit) { notify("Enter a measurement name and unit."); return; }
+    state.settings.measurementTypes = state.settings.measurementTypes || [];
+    if (state.settings.measurementTypes.some(function (item) { return item.name.toLowerCase() === name.toLowerCase(); })) {
+      notify("That measurement type already exists."); return;
+    }
+    state.settings.measurementTypes.push({ name: name, unit: unit });
+    state.ui.measurementType = name;
+    state.ui.measurementTypeFormOpen = false;
+    state.ui.measurementFormOpen = true;
+    save(); render(); notify(name + " added. Enter a monthly reading whenever you’re ready.");
+  }
   function submitMeasurement(f) {
     const month = f.elements.month.value, name = f.elements.name.value.trim(), raw = String(f.elements.value.value).trim();
-    if (!name || raw === "") { notify("Enter a measurement name and value."); return; }
-    const unit = f.elements.unit.value;
+    if (!name || raw === "" || !Number.isFinite(Number(raw))) { notify("Choose a measurement type and enter its monthly value."); return; }
+    const type = registeredMeasurementTypes().find(function (item) { return item.name === name; });
+    if (!type) { notify("Add this measurement type first."); return; }
     state.measurements = state.measurements.filter(function (m) { return !(m.month === month && m.name.toLowerCase() === name.toLowerCase()); });
-    state.measurements.push({ id: randomId(), month: month, name: name, value: Number(raw), unit: unit });
+    state.measurements.push({ id: randomId(), month: month, name: name, value: Number(raw), unit: type.unit });
+    state.ui.measurementFormOpen = false;
     save(); render(); notify("Monthly measurement saved.");
   }
   function submitTargets(f) {
@@ -963,7 +1069,11 @@
     const b = event.target.closest("[data-action]");
     if (!b) return;
     const action = b.dataset.action;
-    if (action === "shift-date") { state.ui.selectedDate = addDays(state.ui.selectedDate, Number(b.dataset.delta)); save(); render(); }
+    if (action === "open-measurement-type") { state.ui.measurementTypeFormOpen = true; state.ui.measurementFormOpen = false; save(); render(); }
+    else if (action === "cancel-measurement-type") { state.ui.measurementTypeFormOpen = false; save(); render(); }
+    else if (action === "cancel-measurement-entry") { state.ui.measurementFormOpen = false; save(); render(); }
+    else if (action === "log-measurement") { state.ui.measurementType = b.dataset.name; state.ui.measurementFormOpen = true; state.ui.measurementTypeFormOpen = false; save(); render(); }
+    else if (action === "shift-date") { state.ui.selectedDate = addDays(state.ui.selectedDate, Number(b.dataset.delta)); save(); render(); }
     else if (action === "shift-week") { state.ui.reviewWeek = addDays(state.ui.reviewWeek, Number(b.dataset.delta) * 7); save(); render(); }
     else if (action === "select-date" || action === "edit-date") { state.ui.selectedDate = b.dataset.date; state.ui.view = "today"; save(); render(); }
     else if (action === "remove-session") {
@@ -985,6 +1095,7 @@
     if (e.id === "selectedDate") state.ui.selectedDate = e.value || today();
     else if (e.id === "weightDate") state.ui.weightDate = e.value || monday(today());
     else if (e.id === "measurementMonth") state.ui.measurementMonth = e.value || monthString(today());
+    else if (e.id === "measurementTypeSelect") state.ui.measurementType = e.value;
     else if (e.id === "historyMonth") state.ui.historyMonth = e.value || monthString(today());
     else if (e.id === "overrideDate") state.ui.overrideDate = e.value || today();
     else if (e.id === "restoreFile" && e.files && e.files[0]) { restoreBackup(e.files[0]); return; }
@@ -1000,6 +1111,7 @@
     else if (f.id === "workoutForm") await submitWorkout(f);
     else if (f.id === "weightForm") submitWeight(f);
     else if (f.id === "measurementForm") submitMeasurement(f);
+    else if (f.id === "measurementTypeForm") submitMeasurementType(f);
     else if (f.id === "weeklyTargetsForm") submitTargets(f);
     else if (f.id === "dailyOverrideForm") submitOverride(f);
     else if (f.id === "reminderForm") await enableReminder(f);
@@ -1014,6 +1126,7 @@
       settings: {
         targets: [{ effectiveFrom: "2026-01-05", ...BASE }, { effectiveFrom: "2026-11-02", ...CURRENT }],
         dailyOverrides: {},
+        measurementTypes: [],
         weightLossGoalPerWeek: 2,
         logPoints: [],
         reminder: { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null },
@@ -1038,6 +1151,7 @@
   state.settings = state.settings || {};
   state.settings.targets = state.settings.targets || [{ effectiveFrom: "2026-01-05", ...BASE }, { effectiveFrom: "2026-11-02", ...CURRENT }];
   state.settings.dailyOverrides = state.settings.dailyOverrides || {};
+  state.settings.measurementTypes = state.settings.measurementTypes || [];
   state.settings.logPoints = state.settings.logPoints || [];
   state.settings.reminder = state.settings.reminder || { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null };
   state.settings.importSummary = state.settings.importSummary || copy(seed.importSummary || {});
@@ -1047,6 +1161,8 @@
   state.ui.reviewWeek = state.ui.reviewWeek || monday(today());
   state.ui.weightDate = state.ui.weightDate || monday(today());
   state.ui.measurementMonth = state.ui.measurementMonth || monthString(today());
+  state.ui.measurementTypeFormOpen = !!state.ui.measurementTypeFormOpen;
+  state.ui.measurementFormOpen = !!state.ui.measurementFormOpen;
   state.ui.historyMonth = state.ui.historyMonth || monthString(today());
   state.ui.overrideDate = state.ui.overrideDate || today();
   const priorShared = sharedState();

@@ -1,6 +1,6 @@
 # Daily Tracker
 
-A daily log and weekly review app with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 2.1.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
@@ -10,7 +10,8 @@ A daily log and weekly review app with automatic workbook history, offline local
 - Weekly review totals without repeating the daily table; missing values stay blank.
 - Monday Withings weigh-ins: weight, fat mass %, lean mass %, BMI, and muscle mass %.
 - A four-week weight trend and a reminder to review your records before choosing whether to adjust targets.
-- Monthly body measurements with user-defined names and units.
+- Monthly measurement cards with user-defined names and units plus month-to-month trend lines.
+- The Daily Log keeps Move, Exercise, and Steps entry controls; weekly totals stay in Weekly Review.
 - Weekly targets that carry forward until changed, with optional one-week and one-day overrides.
 - One logging point per day, with no points removed for missed days.
 - JSON backup and restore.
