@@ -1,4 +1,4 @@
-const CACHE = "daily-tracker-shell-v2-2-0";
+const CACHE = "daily-tracker-shell-v2-3-0";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./seed-history.js", "./manifest.webmanifest", "./icons/tracker.svg"];
 
 self.addEventListener("install", function (event) {

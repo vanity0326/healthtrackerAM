@@ -1,20 +1,21 @@
-# Daily Tracker
+# TONI'S TOTAL TRANSFORMATION TRACKER
 
-Version 2.2.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 2.3.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
-- Daily food total with a 1,700-calorie guide and 11,900-calorie weekly target.
+- Daily food range of 1,500–1,700 calories with an 11,900-calorie weekly target; low and high readings are both marked amber. The range follows the scheduled daily food guide with a 200-calorie lower band.
 - All-day Move Active Calories, workout-only Active Calories, and steps.
 - Multiple workout sessions per day, with their Active Calories summed.
-- Weekly review totals without repeating the daily table; missing values stay blank.
+- Weekly review totals without repeating the daily table; missing values stay blank. Food review also shows the average and how many logged days fell within the target range.
 - Monday Withings weigh-ins: weight, fat mass %, lean mass %, BMI, and muscle mass %.
 - A four-week weight trend and a reminder to review your records before choosing whether to adjust targets.
 - Measurement tab cards for Weight, Fat Mass %, Lean Mass %, BMI, and Muscle Mass %, sourced directly from the Weight tab, plus monthly cards for neck, shoulders, chest, band (chest), bicep, waist, hips, thigh, and calf.
 - Add any other monthly measurement name and unit, with month-to-month trend lines.
 - The Daily Log keeps Move, Exercise, and Steps entry controls; weekly totals stay in Weekly Review.
 - Weekly targets that carry forward until changed, with optional one-week and one-day overrides.
-- One logging point per day, with no points removed for missed days.
+- One point for the first saved daily entry each calendar day, even when recording the previous day; missed days never remove points.
+- The app opens to the Today tab with yesterday selected and a Today shortcut.
 - JSON backup and restore.
 - Spreadsheet history appears automatically on first open.
 - Cross-device sync through a Netlify Function and Netlify Blobs, with conditional writes and conflict merging.
@@ -30,7 +31,7 @@ Existing app data takes priority if a date already has an entry. Imported record
 
 The workbook targets remain attached to their historical weeks. The revised exercise and steps targets start Monday, November 2, 2026:
 
-- Food: 11,900 calories/week (1,700/day guide)
+- Food: 11,900 calories/week (1,700/day upper edge; 1,500/day lower edge)
 - Move: 5,250 Active Calories/week
 - Exercise: 2,000 workout Active Calories/week
 - Steps: 5,600/day average

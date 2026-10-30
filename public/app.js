@@ -151,6 +151,41 @@
     Object.keys(out).forEach(function (key) { if (Number.isFinite(override[key])) out[key] = override[key]; });
     return out;
   }
+  function foodBounds(date) {
+    const upper = guides(date).foodDaily;
+    return { lower: Math.min(upper, Math.max(1200, upper - 200)), upper: upper };
+  }
+  function foodStatus(value, date) {
+    const range = foodBounds(date);
+    if (value < range.lower) return { key: "below", text: "Below range by " + number(range.lower - value) + " calories" };
+    if (value > range.upper) return { key: "above", text: "Above range by " + number(value - range.upper) + " calories" };
+    return { key: "within", text: "Within range · " + number(range.lower) + "–" + number(range.upper) + " calories" };
+  }
+  function foodRangeVisual(date, value) {
+    const range = foodBounds(date);
+    const scaleMax = Math.max(2400, Math.ceil(range.upper * 1.4 / 100) * 100,
+      value === null ? 0 : Math.ceil(value * 1.1 / 100) * 100);
+    const visual = node("div", "food-range-visual");
+    visual.setAttribute("role", "img");
+    visual.setAttribute("aria-label", value === null
+      ? "Daily food target range " + number(range.lower) + " to " + number(range.upper) + " calories"
+      : "Food intake " + number(value) + " calories. " + foodStatus(value, date).text);
+    const track = node("div", "food-range-track");
+    const band = node("span", "food-range-band");
+    band.style.left = (range.lower / scaleMax * 100) + "%";
+    band.style.width = ((range.upper - range.lower) / scaleMax * 100) + "%";
+    track.appendChild(band);
+    if (value !== null) {
+      const marker = node("span", "food-range-marker " + foodStatus(value, date).key);
+      marker.style.left = Math.min(100, Math.max(0, value / scaleMax * 100)) + "%";
+      track.appendChild(marker);
+    }
+    visual.appendChild(track);
+    const axis = node("div", "food-range-axis");
+    axis.append(node("span", "", "0"), node("span", "", "Target " + number(range.lower) + "–" + number(range.upper)), node("span", "", number(scaleMax) + "+"));
+    visual.appendChild(axis);
+    return visual;
+  }
   function getMetric(log, metric) {
     if (!log) return null;
     if (metric === "exercise") {
@@ -179,10 +214,13 @@
     strip.setAttribute("aria-label", metric + " entries by day");
     daysOf(start).forEach(function (day) {
       const value = getMetric(state.logs[day], metric);
-      const cls = "day-cell" + (day === selected ? " selected" : "") + (value === null ? " empty" : " recorded");
+      const foodState = metric === "food" && value !== null ? foodStatus(value, day).key : null;
+      const cls = "day-cell" + (day === selected ? " selected" : "") +
+        (value === null ? " empty" : metric === "food" ? " food-entry food-" + foodState : " recorded");
       const b = button("", cls, "select-date");
       b.dataset.date = day;
-      b.setAttribute("aria-label", shortDay(day) + ", " + (value === null ? "not logged" : number(value) + (metric === "steps" ? " steps" : " calories")));
+      const foodLabel = foodState ? " · " + foodStatus(value, day).text : "";
+      b.setAttribute("aria-label", shortDay(day) + ", " + (value === null ? "not logged" : number(value) + (metric === "steps" ? " steps" : " calories" + foodLabel)));
       b.appendChild(node("span", "dow", shortDay(day)));
       let shown = value === null ? "—" : number(value);
       if (compactSteps && value !== null && value >= 10000) shown = (value / 1000).toFixed(0) + "k";
@@ -204,6 +242,7 @@
     const next = button("›", "date-nav", "shift-date");
     prev.dataset.delta = "-1"; next.dataset.delta = "1";
     wrap.append(prev, datePicker("selectedDate", date, "Selected day"), next);
+    if (date !== today()) wrap.appendChild(button("Today", "text-button", "jump-today"));
     return wrap;
   }
 
@@ -211,42 +250,35 @@
     const date = state.ui.selectedDate;
     const weekStart = monday(date);
     const target = getTargets(date);
-    const guide = guides(date);
     const log = state.logs[date] || {};
     const totals = weekData(weekStart);
     const foodValue = getMetric(log, "food");
     app.appendChild(titleBlock("Daily log", fmt(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" }), makeDateActions(date)));
     addFlash(app);
     const status = node("div", "log-status");
-    status.append(node("span", "positive-note", hasEntry(log) ? "You showed up to log today. You can add more later." : "One entry is enough to get started."));
+    status.append(node("span", "positive-note", hasEntry(log) ? "This date is logged. You can add more later." : "A partial entry is enough to get started."));
     status.append(node("span", "tag", hasEntry(log) ? "Saved" : "Not logged yet"));
     app.appendChild(status);
 
-    const foodCard = card("Food", "One daily total · weekly goal " + number(target.food) + " calories");
+    const foodRange = foodBounds(date);
+    const foodCard = card("Food", "Daily range · weekly goal " + number(target.food) + " calories");
     const head = node("div", "card-head");
     const headLeft = node("div");
-    headLeft.appendChild(node("p", "card-intro", foodValue === null ? "No food total entered yet." : number(foodValue) + " calories logged today"));
-    head.append(headLeft, node("span", "tag", "Daily guide " + number(guide.food)));
+    headLeft.appendChild(node("p", "card-intro", foodValue === null ? "No food total entered yet." : number(foodValue) + " calories logged for this date"));
+    head.append(headLeft, node("span", "tag", "Target " + number(foodRange.lower) + "–" + number(foodRange.upper)));
     foodCard.appendChild(head);
+    foodCard.appendChild(foodRangeVisual(date, foodValue));
     if (foodValue !== null) {
-      const progress = node("div", "food-progress");
-      progress.setAttribute("role", "progressbar");
-      progress.setAttribute("aria-label", "Food compared with today's guide");
-      progress.setAttribute("aria-valuemin", "0"); progress.setAttribute("aria-valuemax", "100");
-      progress.setAttribute("aria-valuenow", String(Math.min(100, Math.round(foodValue / guide.food * 100))));
-      const fill = node("span");
-      fill.style.width = Math.min(100, Math.max(0, foodValue / guide.food * 100)) + "%";
-      progress.appendChild(fill); foodCard.appendChild(progress);
       const detail = node("div", "food-values");
-      detail.append(node("span", "", number(foodValue) + " logged"), node("span", "", number(Math.max(0, guide.food - foodValue)) + " to guide"));
+      detail.append(node("span", "", number(foodValue) + " logged"), node("strong", "food-range-status " + foodStatus(foodValue, date).key, foodStatus(foodValue, date).text));
       foodCard.appendChild(detail);
-    } else foodCard.appendChild(empty("Daily guide: " + number(guide.food) + " calories."));
+    } else foodCard.appendChild(empty("Log a total to see whether it falls below, within, or above your range."));
     addWeeklyTotal(foodCard, totals.food.count ? number(totals.food.sum) + " cal" : "No totals yet", target.food, "This week", totals.food.count);
     foodCard.appendChild(dayStrip("food", weekStart, date, false));
     app.appendChild(foodCard);
 
     const dailyForm = form("dailyForm");
-    dailyForm.append(node("h3", "", "Today's entries"), node("p", "card-intro", "Save what you have now and update it later."));
+    dailyForm.append(node("h3", "", "Entries for this date"), node("p", "card-intro", "Save what you have now and update it later."));
     const hiddenDate = document.createElement("input"); hiddenDate.type = "hidden"; hiddenDate.name = "date"; hiddenDate.value = date;
     dailyForm.appendChild(hiddenDate);
     const inputGrid = node("div", "form-grid");
@@ -260,7 +292,7 @@
     const noWorkout = document.createElement("input");
     noWorkout.type = "checkbox"; noWorkout.name = "noWorkout"; noWorkout.checked = !!log.noWorkout;
     noWorkout.disabled = !!(log.sessions && log.sessions.length);
-    noWorkoutLabel.append(noWorkout, node("span", "", "No workout today (record 0 Active Calories)"));
+    noWorkoutLabel.append(noWorkout, node("span", "", "No workout on this date (record 0 Active Calories)"));
     dailyForm.append(noWorkoutLabel);
     const saveDaily = button("Save daily entries", "primary-button"); saveDaily.type = "submit";
     dailyForm.appendChild(saveDaily); app.appendChild(dailyForm);
@@ -268,7 +300,7 @@
     const sessions = log.sessions || [];
     const exerciseTotal = getMetric(log, "exercise");
     const workoutCard = card("Exercise sessions", "Record workout Active Calories from Apple Fitness. Multiple sessions add together.");
-    workoutCard.appendChild(node("div", "weekly-total", (exerciseTotal === null ? "No exercise entry" : number(exerciseTotal) + " Active Calories today") + " · " + number(target.exercise) + " per week"));
+    workoutCard.appendChild(node("div", "weekly-total", (exerciseTotal === null ? "No exercise entry" : number(exerciseTotal) + " Active Calories for this date") + " · " + number(target.exercise) + " per week"));
     if (sessions.length) {
       const list = node("div", "session-list");
       sessions.forEach(function (session) {
@@ -293,7 +325,7 @@
     workoutCard.appendChild(node("p", "hint", "Move is the all-day Active Calories total. Exercise is workout-only and kept separate."));
     app.appendChild(workoutCard);
 
-    const pointsCard = card("Logging reward", "One point for the first saved entry each day. Missed days never erase points.");
+    const pointsCard = card("Logging reward", "One point for your first saved daily entry each calendar day, even when you log yesterday. Missed days never erase points.");
     pointsCard.appendChild(node("div", "big-value", String(state.settings.logPoints.length) + " points"));
     app.appendChild(pointsCard);
   }
@@ -302,7 +334,14 @@
     const data = weekData(weekStart)[metric];
     const actual = metric === "steps" ? data.average : data.sum;
     const end = addDays(weekStart, 6);
-    const detail = data.count ? (end < today() ? data.count + " of 7 days recorded" : data.count + " days recorded so far") + (metric === "steps" ? " · mean of recorded days" : "") : "No entries; blank days are not zero.";
+    let detail = data.count ? (end < today() ? data.count + " of 7 days recorded" : data.count + " days recorded so far") + (metric === "steps" ? " · mean of recorded days" : "") : "No entries; blank days are not zero.";
+    if (metric === "food" && data.count) {
+      const inRange = daysOf(weekStart).filter(function (day) {
+        const value = getMetric(state.logs[day], "food");
+        return value !== null && value >= foodBounds(day).lower && value <= foodBounds(day).upper;
+      }).length;
+      detail += " · avg " + number(data.average) + " cal/day · " + inRange + " of " + data.count + " logged in range";
+    }
     const wrap = node("div", "target-row");
     const left = node("div");
     left.append(node("strong", "", title), node("div", "target-label", detail));
@@ -650,7 +689,7 @@
     reminderGrid.append(field("Reminder time (local)", "time", state.settings.reminder.time || "09:00", { type: "time" }));
     reminderGrid.append(field("Private setup key", "apiKey", state.settings.reminder.apiKey || "", { type: "password", placeholder: "Set during deployment" }));
     remindersForm.appendChild(reminderGrid);
-    remindersForm.appendChild(node("p", "hint", "The app must be installed and deployed with push keys. Daily health records stay on this device."));
+    remindersForm.appendChild(node("p", "hint", "The app must be installed and deployed with push keys. Reminder settings are per device; tracker data syncs across devices when online."));
     const enable = button(state.settings.reminder.enabled ? "Update reminder settings" : "Enable device reminders", "primary-button"); enable.type = "submit";
     remindersForm.appendChild(enable);
     if (state.settings.reminder.enabled) remindersForm.appendChild(button("Turn reminders off", "secondary-button", "disable-reminders"));
@@ -911,8 +950,9 @@
     flash = message; render();
     window.setTimeout(function () { flash = ""; render(); }, 4500);
   }
-  function awardPoint(date) {
-    if (date === today() && !state.settings.logPoints.includes(date)) state.settings.logPoints.push(date);
+  function awardPoint() {
+    const loggedOn = today();
+    if (!state.settings.logPoints.includes(loggedOn)) state.settings.logPoints.push(loggedOn);
   }
 
   async function syncReminder(date) {
@@ -944,9 +984,10 @@
     if (f.elements.noWorkout.checked && next.sessions.length) { notify("Remove the workout sessions before marking a no-workout day."); return; }
     if (f.elements.noWorkout.checked) { next.noWorkout = true; next.exerciseLogged = true; next.sessions = []; }
     else if (!next.sessions.length) { next.noWorkout = false; next.exerciseLogged = false; }
-    if (hasEntry(next)) state.logs[date] = next; else delete state.logs[date];
-    awardPoint(date); save(); render();
-    if (date === today()) await syncReminder(date);
+    if (hasEntry(next)) { state.logs[date] = next; awardPoint(); }
+    else delete state.logs[date];
+    save(); render();
+    if (hasEntry(next)) await syncReminder(today());
     notify("Saved. Add another entry whenever you’re ready.");
   }
   async function submitWorkout(f) {
@@ -958,8 +999,8 @@
     log.sessions = log.sessions || [];
     log.sessions.push({ id: randomId(), name: name, activeCalories: Number(raw), source: "manual" });
     log.exerciseLogged = true; log.noWorkout = false; state.logs[date] = log;
-    awardPoint(date); save(); render();
-    if (date === today()) await syncReminder(date);
+    awardPoint(); save(); render();
+    await syncReminder(today());
     notify("Workout added to the daily exercise total.");
   }
   function submitWeight(f) {
@@ -1119,7 +1160,8 @@
     const b = event.target.closest("[data-action]");
     if (!b) return;
     const action = b.dataset.action;
-    if (action === "open-measurement-type") { state.ui.measurementTypeFormOpen = true; state.ui.measurementFormOpen = false; save(); render(); }
+    if (action === "jump-today") { state.ui.selectedDate = today(); save(); render(); }
+    else if (action === "open-measurement-type") { state.ui.measurementTypeFormOpen = true; state.ui.measurementFormOpen = false; save(); render(); }
     else if (action === "cancel-measurement-type") { state.ui.measurementTypeFormOpen = false; save(); render(); }
     else if (action === "cancel-measurement-entry") { state.ui.measurementFormOpen = false; save(); render(); }
     else if (action === "log-measurement") { state.ui.measurementType = b.dataset.name; state.ui.measurementFormOpen = true; state.ui.measurementTypeFormOpen = false; save(); render(); }
@@ -1206,8 +1248,8 @@
   state.settings.reminder = state.settings.reminder || { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null };
   state.settings.importSummary = state.settings.importSummary || copy(seed.importSummary || {});
   state.ui = state.ui || {};
-  state.ui.view = state.ui.view || "today";
-  state.ui.selectedDate = state.ui.selectedDate || today();
+  state.ui.view = "today";
+  state.ui.selectedDate = addDays(today(), -1);
   state.ui.reviewWeek = state.ui.reviewWeek || monday(today());
   state.ui.weightDate = state.ui.weightDate || monday(today());
   state.ui.measurementMonth = state.ui.measurementMonth || monthString(today());

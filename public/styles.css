@@ -84,8 +84,21 @@ button.day-cell { cursor:pointer; }
 .day-cell .dow { display:block; color:var(--muted); font-size:10px; font-weight:650; }
 .day-cell .day-value { display:block; margin-top:3px; font-size:10px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .day-cell.empty .day-value { color:var(--quiet); font-weight:500; }
-.food-progress { height:11px; overflow:hidden; border-radius:999px; background:#E9E3D0; margin-top:11px; }
-.food-progress span { display:block; height:100%; border-radius:999px; background:var(--sage); }
+.food-range-visual { margin:8px 2px 5px; }
+.food-range-track { position:relative; height:14px; margin:15px 2px 6px; border-radius:999px; background:#E9E3D0; }
+.food-range-band { position:absolute; top:0; bottom:0; border:1px solid var(--sage); border-radius:999px; background:var(--sage-soft); }
+.food-range-marker { position:absolute; top:-5px; width:4px; height:24px; border-radius:4px; transform:translateX(-50%); background:var(--amber); }
+.food-range-marker.within { background:var(--sage); }
+.food-range-axis { display:flex; justify-content:space-between; gap:8px; color:var(--quiet); font-size:10px; font-variant-numeric:tabular-nums; }
+.food-range-axis span:nth-child(2) { color:var(--muted); font-weight:650; text-align:center; }
+.food-range-status { display:inline-flex; padding:3px 7px; border-radius:8px; font-size:11px; font-weight:650; }
+.food-range-status.within { background:var(--sage-soft); color:#24542B; }
+.food-range-status.below, .food-range-status.above { background:var(--amber-soft); color:#654100; }
+.day-cell.food-entry.food-within { background:var(--sage-soft); }
+.day-cell.food-entry.food-below, .day-cell.food-entry.food-above { background:var(--amber-soft); }
+.day-cell.food-entry.selected.food-within { border-color:var(--sage); }
+.day-cell.food-entry.selected.food-below, .day-cell.food-entry.selected.food-above { border-color:var(--amber); }
+.food-values strong { text-align:right; }
 .food-values { display:flex; justify-content:space-between; gap:10px; margin-top:7px; color:var(--muted); font-size:12px; }
 .metrics-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .metric-card { padding:14px 12px; background:#F7F3E5; border:1px solid #E7DCB7; border-radius:13px; }

@@ -1,4 +1,4 @@
-Daily Tracker - Version 2.2.0 build notes
+TONI'S TOTAL TRANSFORMATION TRACKER - Version 2.3.0 build notes
 
 Static app assets: public/
 Netlify Functions: netlify/functions/
@@ -9,4 +9,4 @@ Local cache: browser localStorage; JSON backup available in More.
 Cross-device data endpoint: /api/data (no sign-in, per user preference).
 Device reminder endpoint: /api/reminders (separate authenticated setup key).
 
-Version 2.2.0 adds five read-only measurement cards backed by the Weight tab's existing weekly weigh-ins, plus predefined monthly cards for neck, shoulders, chest, band (chest), bicep, waist, hips, thigh, and calf. Custom monthly measurement types remain available. Daily Log and history import, targets, reminders, and Netlify Blobs synchronization are retained from Version 2.1.0.
+Version 2.3.0 opens the Daily Log to yesterday with a Today shortcut. The logging reward awards one point for the first saved daily/workout entry on the current calendar day, independent of the date being recorded; blank saves do not award points. Food intake is shown against a bounded target range (1,500-1,700 calories with current targets), with green for within-range and amber for below/above. Weekly Review shows the average and the count of logged days in range. The PWA/app name is TONI'S TOTAL TRANSFORMATION TRACKER. Measurement cards and workbook history from Version 2.2.0 remain included.
