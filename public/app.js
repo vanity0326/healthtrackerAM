@@ -6,6 +6,19 @@
   const seed = window.DAILY_TRACKER_HISTORY_SEED || { dailyLogDays: {}, weighIns: {}, importSummary: {} };
   const BASE = { food: 11900, move: 5250, exercise: 4375, steps: 10000 };
   const CURRENT = { food: 11900, move: 5250, exercise: 2000, steps: 5600 };
+  const BUILT_IN_MEASUREMENTS = [
+    { name: "Neck", unit: "in" }, { name: "Shoulders", unit: "in" },
+    { name: "Chest", unit: "in" }, { name: "Band (chest)", unit: "in" },
+    { name: "Bicep", unit: "in" }, { name: "Waist", unit: "in" },
+    { name: "Hips", unit: "in" }, { name: "Thigh", unit: "in" }, { name: "Calf", unit: "in" }
+  ];
+  const WEIGHT_METRICS = [
+    { label: "Weight", key: "weightLbs", unit: "lb", digits: 1 },
+    { label: "Fat Mass %", key: "fatMassPct", unit: "%", digits: 1 },
+    { label: "Lean Mass %", key: "leanMassPct", unit: "%", digits: 1 },
+    { label: "BMI", key: "bmi", unit: "", digits: 1 },
+    { label: "Muscle Mass %", key: "muscleMassPct", unit: "%", digits: 1 }
+  ];
   let flash = "";
   let state;
   let syncStatus = "loading";
@@ -397,6 +410,7 @@
   }
   function registeredMeasurementTypes() {
     const types = new Map();
+    BUILT_IN_MEASUREMENTS.forEach(function (type) { types.set(type.name.toLowerCase(), type); });
     (state.settings.measurementTypes || []).forEach(function (type) {
       if (type && type.name) types.set(type.name.toLowerCase(), { name: type.name, unit: type.unit || "in" });
     });
@@ -460,6 +474,40 @@
       container.appendChild(node("p", "hint", "One reading recorded · add another month to see a trend."));
     }
   }
+  function weightMetricCard(metric, month) {
+    const c = card(metric.label, "From Weight tab · weekly Monday readings");
+    const records = Object.keys(state.weighIns).filter(function (day) {
+      return day.slice(0, 7) <= month && Number.isFinite(state.weighIns[day][metric.key]);
+    }).sort().slice(-6).map(function (day) { return { day: day, value: state.weighIns[day][metric.key] }; });
+    if (!records.length) {
+      c.appendChild(empty("No " + metric.label.toLowerCase() + " readings yet. Add them on the Weight tab."));
+      return c;
+    }
+    const latest = records[records.length - 1], previous = records.length > 1 ? records[records.length - 2] : null;
+    const summary = node("div", "measurement-current");
+    summary.appendChild(node("strong", "", number(latest.value, metric.digits) + (metric.unit ? " " + metric.unit : "")));
+    summary.appendChild(node("span", "", fmt(latest.day, { month: "short", day: "numeric", year: "numeric" })));
+    c.appendChild(summary);
+    if (previous) {
+      const delta = latest.value - previous.value;
+      c.appendChild(node("p", "measurement-change", (delta > 0 ? "+" : "") + number(delta, metric.digits) + (metric.unit ? " " + metric.unit : "") + " since " + fmt(previous.day, { month: "short", day: "numeric" })));
+      const svgNS = "http://www.w3.org/2000/svg", chart = document.createElementNS(svgNS, "svg");
+      chart.setAttribute("viewBox", "0 0 300 56"); chart.setAttribute("role", "img");
+      chart.setAttribute("aria-label", metric.label + " weekly trend from Weight tab");
+      const values = records.map(function (item) { return item.value; });
+      const low = Math.min.apply(null, values), high = Math.max.apply(null, values), span = high - low || 1;
+      const coords = records.map(function (item, index) { return { x: 8 + index * (284 / Math.max(1, records.length - 1)), y: 43 - ((item.value - low) / span) * 32 }; });
+      const baseline = document.createElementNS(svgNS, "path"); baseline.setAttribute("class", "measurement-baseline"); baseline.setAttribute("d", "M4 47H296"); chart.appendChild(baseline);
+      const line = document.createElementNS(svgNS, "path"); line.setAttribute("class", "measurement-line");
+      line.setAttribute("d", coords.map(function (point, index) { return (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1); }).join(" ")); chart.appendChild(line);
+      coords.forEach(function (point, index) { const dot = document.createElementNS(svgNS, "circle"); dot.setAttribute("cx", point.x.toFixed(1)); dot.setAttribute("cy", point.y.toFixed(1)); dot.setAttribute("r", index === coords.length - 1 ? "4" : "3"); chart.appendChild(dot); });
+      c.appendChild(chart);
+      const labels = node("div", "measurement-months"); labels.style.gridTemplateColumns = "repeat(" + records.length + ", minmax(0, 1fr))";
+      records.forEach(function (item) { labels.appendChild(node("span", "", fmt(item.day, { month: "short", day: "numeric" }))); });
+      c.appendChild(labels);
+    } else c.appendChild(node("p", "hint", "One weigh-in recorded · another Monday reading will add to this trend."));
+    return c;
+  }
   function renderMeasurementTypeForm() {
     const f = form("measurementTypeForm", "card");
     f.append(node("h3", "", "Add a measurement type"), node("p", "card-intro", "Name any measurement you want to follow and choose its unit."));
@@ -495,18 +543,20 @@
     const types = registeredMeasurementTypes();
     const extra = node("div", "date-row");
     extra.appendChild(monthPicker("measurementMonth", month, "Month to log"));
-    app.appendChild(titleBlock("Measurements", "Monthly check-ins · follow the measurements that matter to you.", extra));
+    app.appendChild(titleBlock("Measurements", "Your weekly scale trends and monthly body measurements, together.", extra));
     addFlash(app);
+    app.appendChild(node("h2", "section-title", "From your Weight tab"));
+    app.appendChild(node("p", "card-intro", "These cards use your existing Monday weigh-ins. Log each reading once on the Weight tab."));
+    const weightCards = node("div", "measurement-cards measurement-source-cards");
+    WEIGHT_METRICS.forEach(function (metric) { weightCards.appendChild(weightMetricCard(metric, month)); });
+    app.appendChild(weightCards);
+    app.appendChild(node("h2", "section-title", "Monthly measurements"));
+    app.appendChild(node("p", "card-intro", "Log these once a month. Add any other measurement and unit whenever you want."));
     const controls = node("div", "button-row");
     controls.appendChild(button("＋ Add measurement type", "secondary-button", "open-measurement-type"));
     app.appendChild(controls);
     if (state.ui.measurementTypeFormOpen) app.appendChild(renderMeasurementTypeForm());
     if (state.ui.measurementFormOpen) app.appendChild(renderMeasurementEntryForm(month, types));
-    if (!types.length) {
-      app.appendChild(card("Your measurement cards", "Add any type and unit you want; it will get its own monthly card and progress trend."));
-      app.lastChild.appendChild(empty("No types added yet. Try waist, hips, arm, thigh, or any measurement you prefer."));
-      return;
-    }
     const list = node("div", "measurement-cards");
     types.forEach(function (type) {
       const c = card(type.name, "Monthly measurement · " + type.unit);
@@ -926,7 +976,7 @@
     const name = f.elements.name.value.trim(), unit = f.elements.unit.value.trim();
     if (!name || !unit) { notify("Enter a measurement name and unit."); return; }
     state.settings.measurementTypes = state.settings.measurementTypes || [];
-    if (state.settings.measurementTypes.some(function (item) { return item.name.toLowerCase() === name.toLowerCase(); })) {
+    if (registeredMeasurementTypes().some(function (item) { return item.name.toLowerCase() === name.toLowerCase(); })) {
       notify("That measurement type already exists."); return;
     }
     state.settings.measurementTypes.push({ name: name, unit: unit });

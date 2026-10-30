@@ -139,7 +139,9 @@ th:first-child, td:first-child { text-align:left; }
 .list-row:first-child { border-top:0; }
 .list-row-head { display:flex; justify-content:space-between; gap:10px; align-items:center; }
 .measure-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(90px,.7fr) minmax(80px,.6fr) auto; gap:8px; align-items:end; }
-.measurement-cards { display:grid; gap:10px; }
+.measurement-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; align-items:stretch; }
+.section-title { margin:18px 2px 5px; font-size:17px; }
+.measurement-source-cards .card { min-width:0; }
 .measurement-current { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-top:8px; }
 .measurement-current strong { font-size:20px; font-weight:750; font-variant-numeric:tabular-nums; }
 .measurement-current span { color:var(--muted); font-size:12px; }
