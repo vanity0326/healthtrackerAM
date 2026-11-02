@@ -423,6 +423,34 @@
     const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "date"; hidden.value = selected;
     const saveWeight = button("Save Monday reading", "primary-button"); saveWeight.type = "submit";
     f.append(hidden, saveWeight); app.appendChild(f);
+    const month = state.ui.measurementMonth || monthString(today());
+    const types = registeredMeasurementTypes();
+    const extraMeasurements = node("div", "date-row");
+    extraMeasurements.appendChild(monthPicker("measurementMonth", month, "Month to log"));
+    app.appendChild(titleBlock("Monthly measurements", "Log these once a month. Add any other measurement and unit whenever you want.", extraMeasurements));
+    const controls = node("div", "button-row");
+    controls.appendChild(button("＋ Add measurement type", "secondary-button", "open-measurement-type"));
+    app.appendChild(controls);
+    if (state.ui.measurementTypeFormOpen) app.appendChild(renderMeasurementTypeForm());
+    if (state.ui.measurementFormOpen) app.appendChild(renderMeasurementEntryForm(month, types));
+    const measurementList = node("div", "measurement-cards");
+    types.forEach(function (type) {
+      const reading = state.measurements.find(function (item) {
+        return item.month === month && item.name.toLowerCase() === type.name.toLowerCase();
+      });
+      const c = card(type.name, "Monthly measurement · " + type.unit);
+      const summary = node("div", "measurement-current");
+      summary.appendChild(node("strong", "", reading ? number(reading.value, 1) + " " + (reading.unit || type.unit) : "No reading yet"));
+      summary.appendChild(node("span", "", monthLabel(month)));
+      c.appendChild(summary);
+      const action = node("div", "button-row");
+      const log = button((reading ? "Update " : "Log ") + monthLabel(month), "secondary-button", "log-measurement");
+      log.dataset.name = type.name;
+      action.appendChild(log);
+      c.appendChild(action);
+      measurementList.appendChild(c);
+    });
+    app.appendChild(measurementList);
     const history = card("Recent weigh-ins", "Imported scale history; unavailable values remain blank.");
     const dates = Object.keys(state.weighIns).filter(function (day) { return Number.isFinite(state.weighIns[day].weightLbs); }).sort().reverse().slice(0, 8);
     if (!dates.length) history.appendChild(empty("No weigh-ins recorded."));
@@ -458,9 +486,9 @@
     });
     return Array.from(types.values()).sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
-  function measurementTrend(container, type, month) {
+  function measurementTrend(container, type) {
     const records = state.measurements.filter(function (item) {
-      return item.name.toLowerCase() === type.name.toLowerCase() && item.month <= month;
+      return item.name.toLowerCase() === type.name.toLowerCase() && item.month <= monthString(today());
     }).sort(function (a, b) { return a.month.localeCompare(b.month); }).slice(-6);
     if (!records.length) {
       container.appendChild(empty("No entries yet. Your first monthly reading will start the trend."));
@@ -615,13 +643,16 @@
     if (!types.length) return null;
     const name = state.ui.measurementType && types.some(function (item) { return item.name === state.ui.measurementType; }) ? state.ui.measurementType : types[0].name;
     const type = types.find(function (item) { return item.name === name; }) || types[0];
+    const existing = state.measurements.find(function (item) {
+      return item.month === month && item.name.toLowerCase() === name.toLowerCase();
+    });
     const f = form("measurementForm", "card");
     f.append(node("h3", "", "Log a monthly measurement"), node("p", "card-intro", "Add one reading for the selected month. You can update it later."));
     const hidden = document.createElement("input"); hidden.type = "hidden"; hidden.name = "month"; hidden.value = month;
     f.appendChild(hidden);
     const grid = node("div", "measure-grid");
     grid.append(field("Measurement type", "name", name, { select: true, id: "measurementTypeSelect", options: types.map(function (item) { return { label: item.name, value: item.name }; }) }));
-    grid.append(field("Value", "value", "", { step: "0.1", placeholder: "Monthly reading" }));
+    grid.append(field("Value", "value", existing ? existing.value : "", { step: "0.1", placeholder: "Monthly reading" }));
     grid.appendChild(node("span", "measurement-unit-hint", "Unit: " + type.unit));
     const add = button("Save reading", "primary-button"); add.type = "submit";
     const actions = node("div", "button-row");
@@ -630,36 +661,23 @@
     return f;
   }
   function renderMeasurements() {
-    const month = state.ui.measurementMonth || monthString(today());
     const types = registeredMeasurementTypes();
-    const extra = node("div", "date-row");
-    extra.appendChild(monthPicker("measurementMonth", month, "Month to log"));
-    app.appendChild(titleBlock("Measurements", "Latest Weight-tab readings and monthly body measurements, together.", extra));
+    app.appendChild(titleBlock("Measures", "Review progress from your Weight-tab readings and monthly measurements."));
     addFlash(app);
     app.appendChild(node("h2", "section-title", "From your Weight tab"));
-    app.appendChild(node("p", "card-intro", "These cards always show your latest saved Weight-tab readings, regardless of the month selected below. The monthly graph uses the first available weigh-in in each calendar month."));
+    app.appendChild(node("p", "card-intro", "These cards show your latest saved readings. The monthly graph uses the first available weigh-in in each calendar month."));
     const weightCards = node("div", "measurement-cards measurement-source-cards");
     WEIGHT_METRICS.forEach(function (metric) { weightCards.appendChild(weightMetricCard(metric)); });
     weightCards.appendChild(monthlyWeightTrendCard());
     app.appendChild(weightCards);
     app.appendChild(node("h2", "section-title", "Monthly measurements"));
-    app.appendChild(node("p", "card-intro", "Log these once a month. Add any other measurement and unit whenever you want."));
-    const controls = node("div", "button-row");
-    controls.appendChild(button("＋ Add measurement type", "secondary-button", "open-measurement-type"));
-    app.appendChild(controls);
-    if (state.ui.measurementTypeFormOpen) app.appendChild(renderMeasurementTypeForm());
-    if (state.ui.measurementFormOpen) app.appendChild(renderMeasurementEntryForm(month, types));
+    app.appendChild(node("p", "card-intro", "Monthly measurement trends use your saved readings. Add or update entries on the Weight tab."));
     const list = node("div", "measurement-cards");
     types.forEach(function (type) {
       const c = card(type.name, "Monthly measurement · " + type.unit);
       const trend = node("div", "measurement-trend");
-      measurementTrend(trend, type, month);
+      measurementTrend(trend, type);
       c.appendChild(trend);
-      const action = node("div", "button-row");
-      const log = button("Log " + monthLabel(month), "secondary-button", "log-measurement");
-      log.dataset.name = type.name;
-      action.appendChild(log);
-      c.appendChild(action);
       list.appendChild(c);
     });
     app.appendChild(list);

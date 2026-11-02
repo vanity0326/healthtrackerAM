@@ -1,4 +1,4 @@
-TONI'S TOTAL TRANSFORMATION TRACKER - Version 3.0 build notes
+TONI'S TOTAL TRANSFORMATION TRACKER - Version 4.0 build notes
 
 Static app assets: public/
 Netlify Functions: netlify/functions/
@@ -13,3 +13,5 @@ Version 2.3.0 opened the Daily Log to yesterday with a Today shortcut. The loggi
 
 
 Version 3.0: The five Weight-derived cards always display the latest saved Weight-tab readings, independent of the month selected for body measurements. Added a separate Monthly Weight Trend card after Muscle Mass % in the two-column grid; it plots one point per month from the first available weigh-in on or after the first of that month, once a reading is saved. Service-worker cache updated for Version 3.0.
+
+Version 4.0: Weight is the logging tab for weekly weigh-ins and monthly measurements. Recent weigh-ins appear below the monthly measurement logging cards. Measures contains the latest Weight-tab progress cards, the monthly weight trend, and body measurement trend cards without editing controls. Existing measurement values, weigh-in history, workbook history, and other tracker behavior remain included.
