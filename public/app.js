@@ -513,11 +513,24 @@
       container.appendChild(node("p", "hint", "One reading recorded · add another month to see a trend."));
     }
   }
-  function weightMetricCard(metric, month) {
-    const c = card(metric.label, "From Weight tab · weekly Monday readings");
-    const records = Object.keys(state.weighIns).filter(function (day) {
-      return day.slice(0, 7) <= month && Number.isFinite(state.weighIns[day][metric.key]);
+  function latestWeightRecords(metric) {
+    return Object.keys(state.weighIns).filter(function (day) {
+      return day <= today() && Number.isFinite(state.weighIns[day][metric.key]);
     }).sort().slice(-6).map(function (day) { return { day: day, value: state.weighIns[day][metric.key] }; });
+  }
+  function monthlyWeightRecords() {
+    const firstByMonth = {};
+    Object.keys(state.weighIns).filter(function (day) {
+      return day <= today() && Number.isFinite(state.weighIns[day].weightLbs);
+    }).sort().forEach(function (day) {
+      const month = monthString(day);
+      if (!firstByMonth[month]) firstByMonth[month] = { month: month, day: day, value: state.weighIns[day].weightLbs };
+    });
+    return Object.keys(firstByMonth).sort().slice(-12).map(function (month) { return firstByMonth[month]; });
+  }
+  function weightMetricCard(metric) {
+    const c = card(metric.label, "Latest saved reading from the Weight tab");
+    const records = latestWeightRecords(metric);
     if (!records.length) {
       c.appendChild(empty("No " + metric.label.toLowerCase() + " readings yet. Add them on the Weight tab."));
       return c;
@@ -545,6 +558,45 @@
       records.forEach(function (item) { labels.appendChild(node("span", "", fmt(item.day, { month: "short", day: "numeric" }))); });
       c.appendChild(labels);
     } else c.appendChild(node("p", "hint", "One weigh-in recorded · another Monday reading will add to this trend."));
+    return c;
+  }
+  function monthlyWeightTrendCard() {
+    const c = card("Monthly Weight Trend", "Closest saved weigh-in on or after the first day of each month · last 12 months");
+    const records = monthlyWeightRecords();
+    if (!records.length) {
+      c.appendChild(empty("The monthly trend will begin when a weigh-in is saved this month."));
+      return c;
+    }
+    const svgNS = "http://www.w3.org/2000/svg", chart = document.createElementNS(svgNS, "svg");
+    chart.setAttribute("viewBox", "0 0 300 72");
+    chart.setAttribute("role", "img");
+    chart.setAttribute("aria-label", "Monthly weight trend using the first available weigh-in in each month");
+    const title = document.createElementNS(svgNS, "title");
+    title.textContent = "Weight at the first available weigh-in of each month";
+    chart.appendChild(title);
+    const values = records.map(function (item) { return item.value; });
+    const low = Math.min.apply(null, values), high = Math.max.apply(null, values), span = high - low || 1;
+    const coords = records.map(function (item, index) {
+      return { x: 8 + index * (284 / Math.max(1, records.length - 1)), y: 53 - ((item.value - low) / span) * 40, item: item };
+    });
+    const baseline = document.createElementNS(svgNS, "path");
+    baseline.setAttribute("class", "measurement-baseline"); baseline.setAttribute("d", "M4 57H296"); chart.appendChild(baseline);
+    const line = document.createElementNS(svgNS, "path"); line.setAttribute("class", "measurement-line");
+    line.setAttribute("d", coords.map(function (point, index) { return (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1); }).join(" ")); chart.appendChild(line);
+    coords.forEach(function (point, index) {
+      const dot = document.createElementNS(svgNS, "circle");
+      dot.setAttribute("cx", point.x.toFixed(1)); dot.setAttribute("cy", point.y.toFixed(1));
+      dot.setAttribute("r", index === coords.length - 1 ? "4" : "3");
+      const pointTitle = document.createElementNS(svgNS, "title");
+      pointTitle.textContent = monthLabel(point.item.month) + ": " + number(point.item.value, 1) + " lb (" + fmt(point.item.day, { month: "short", day: "numeric" }) + ")";
+      dot.appendChild(pointTitle); chart.appendChild(dot);
+    });
+    chart.classList.add("monthly-weight-chart");
+    c.appendChild(chart);
+    const labels = node("div", "measurement-months");
+    labels.style.gridTemplateColumns = "repeat(" + records.length + ", minmax(0, 1fr))";
+    records.forEach(function (item) { labels.appendChild(node("span", "", monthLabel(item.month).split(" ")[0].slice(0, 3))); });
+    c.appendChild(labels);
     return c;
   }
   function renderMeasurementTypeForm() {
@@ -582,12 +634,13 @@
     const types = registeredMeasurementTypes();
     const extra = node("div", "date-row");
     extra.appendChild(monthPicker("measurementMonth", month, "Month to log"));
-    app.appendChild(titleBlock("Measurements", "Your weekly scale trends and monthly body measurements, together.", extra));
+    app.appendChild(titleBlock("Measurements", "Latest Weight-tab readings and monthly body measurements, together.", extra));
     addFlash(app);
     app.appendChild(node("h2", "section-title", "From your Weight tab"));
-    app.appendChild(node("p", "card-intro", "These cards use your existing Monday weigh-ins. Log each reading once on the Weight tab."));
+    app.appendChild(node("p", "card-intro", "These cards always show your latest saved Weight-tab readings, regardless of the month selected below. The monthly graph uses the first available weigh-in in each calendar month."));
     const weightCards = node("div", "measurement-cards measurement-source-cards");
-    WEIGHT_METRICS.forEach(function (metric) { weightCards.appendChild(weightMetricCard(metric, month)); });
+    WEIGHT_METRICS.forEach(function (metric) { weightCards.appendChild(weightMetricCard(metric)); });
+    weightCards.appendChild(monthlyWeightTrendCard());
     app.appendChild(weightCards);
     app.appendChild(node("h2", "section-title", "Monthly measurements"));
     app.appendChild(node("p", "card-intro", "Log these once a month. Add any other measurement and unit whenever you want."));

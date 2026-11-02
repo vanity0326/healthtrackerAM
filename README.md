@@ -1,6 +1,6 @@
 # TONI'S TOTAL TRANSFORMATION TRACKER
 
-Version 2.3.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 3.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
@@ -10,7 +10,7 @@ Version 2.3.0 of the daily log and weekly review app, with automatic workbook hi
 - Weekly review totals without repeating the daily table; missing values stay blank. Food review also shows the average and how many logged days fell within the target range.
 - Monday Withings weigh-ins: weight, fat mass %, lean mass %, BMI, and muscle mass %.
 - A four-week weight trend and a reminder to review your records before choosing whether to adjust targets.
-- Measurement tab cards for Weight, Fat Mass %, Lean Mass %, BMI, and Muscle Mass %, sourced directly from the Weight tab, plus monthly cards for neck, shoulders, chest, band (chest), bicep, waist, hips, thigh, and calf.
+- Measurement tab Weight cards always show the latest saved Weight-tab values. A separate monthly weight line graph uses the first available weigh-in in each month. Monthly body-measurement cards remain separate for neck, shoulders, chest, band (chest), bicep, waist, hips, thigh, and calf.
 - Add any other monthly measurement name and unit, with month-to-month trend lines.
 - The Daily Log keeps Move, Exercise, and Steps entry controls; weekly totals stay in Weekly Review.
 - Weekly targets that carry forward until changed, with optional one-week and one-day overrides.
