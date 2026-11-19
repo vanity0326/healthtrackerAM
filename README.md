@@ -1,6 +1,6 @@
 # TONI'S TOTAL TRANSFORMATION TRACKER
 
-Version 4.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 5.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
@@ -67,3 +67,16 @@ The reminders are scheduled server-side so they can arrive when the app is close
 
 The reminder scheduler checks hourly in UTC and sends at the selected local hour. Netlify scheduled functions are used for that background check. Keep the project publish directory set to `public` and functions directory set to `netlify/functions`. The included `netlify.toml` already sets both.
 
+
+
+## Version 5.0 additions
+
+- Daily water tracking in ounces, with a configurable bottle-size quick-add and CSV export.
+- Optional daily notes and intentional recovery-day marker.
+- Workout activity categories (Pilates, walking, strength, core, mobility, other) and optional workout minutes.
+- Review-period selector (calendar week, rolling 7 days, rolling 30 days, current month), progress dashboard, recent consistency calendar, adjacent-period comparisons, and simple personal-record observations.
+- CSV export alongside the existing full JSON backup/restore workflow.
+- Additive local-data upgrade: existing Version 4 records retain the same schema and a one-time pre-upgrade local snapshot is retained in browser storage.
+- Updated service-worker cache and visible app version.
+
+The app continues to use the existing Netlify sync service and local browser storage. No deployment is performed by this package. Backups stored in the same browser/device do not protect against device loss; download the JSON backup periodically and store a copy separately.

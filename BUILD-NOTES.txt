@@ -1,17 +1,18 @@
-TONI'S TOTAL TRANSFORMATION TRACKER - Version 4.0 build notes
+TONI'S TOTAL TRANSFORMATION TRACKER — VERSION 5.0
 
-Static app assets: public/
-Netlify Functions: netlify/functions/
-Shared tracker data: Netlify Blobs store daily-health-tracker / shared-state
-Workbook history source: history-import.json (project root)
-Workbook history seed for automatic local and first-deploy display: public/seed-history.js
-Local cache: browser localStorage; JSON backup available in More.
-Cross-device data endpoint: /api/data (no sign-in, per user preference).
-Device reminder endpoint: /api/reminders (separate authenticated setup key).
+Build summary
+- Preserves the Version 4 schema (schemaVersion 1) so existing records remain readable by the existing Netlify data function.
+- Makes a one-time local pre-V5 snapshot before adding new optional fields.
+- Adds water ounces and configurable bottle quick-add, daily notes, recovery-day marker, workout category and minutes, CSV export, review-period selection, progress dashboard, consistency calendar, adjacent-period comparisons, and personal-record observations.
+- Keeps Move (all-day Active Calories) separate from workout-session Active Calories. Weekly Exercise review totals the Active Calories from session records only.
+- Retains existing JSON backup/restore, measurement, weigh-in, targets, reminders, history import, and sync workflows.
 
-Version 2.3.0 opened the Daily Log to yesterday with a Today shortcut. The logging reward awards one point for the first saved daily/workout entry on the current calendar day, independent of the date being recorded; blank saves do not award points. Food intake is shown against a bounded target range (1,500-1,700 calories with current targets), with green for within-range and amber for below/above. Weekly Review shows the average and the count of logged days in range. The PWA/app name is TONI'S TOTAL TRANSFORMATION TRACKER. Measurement cards and workbook history from Version 2.2.0 remain included.
+Validation
+- JavaScript syntax checked with Node.js.
+- Static source/package/service-worker consistency checked.
+- No live deployment or Netlify data modification performed.
+- Browser end-to-end tests were not available in this build environment; review on a copy before deploying.
 
-
-Version 3.0: The five Weight-derived cards always display the latest saved Weight-tab readings, independent of the month selected for body measurements. Added a separate Monthly Weight Trend card after Muscle Mass % in the two-column grid; it plots one point per month from the first available weigh-in on or after the first of that month, once a reading is saved. Service-worker cache updated for Version 3.0.
-
-Version 4.0: Weight is the logging tab for weekly weigh-ins and monthly measurements. Recent weigh-ins appear below the monthly measurement logging cards. Measures contains the latest Weight-tab progress cards, the monthly weight trend, and body measurement trend cards without editing controls. Existing measurement values, weigh-in history, workbook history, and other tracker behavior remain included.
+Data safety
+- Existing local V4 state is not intentionally reset or rewritten into a new schema. A one-time browser-local snapshot is created before additive defaults are applied.
+- Continue downloading JSON backups to a separate device/drive; a browser-local snapshot is not protection against device loss.

@@ -199,3 +199,7 @@ th:first-child, td:first-child { text-align:left; }
 .trend-values strong { color:var(--ink); font-size:12px; font-variant-numeric:tabular-nums; }
 .section-divider { height:0; }
 .remove { border:0; background:transparent; color:var(--danger); cursor:pointer; padding:6px; font-weight:650; }
+
+.notes-input { width:100%; min-height:84px; padding:10px; border:1px solid #CDBE8B; border-radius:10px; background:#fffef9; color:var(--ink); font:inherit; resize:vertical; }
+.button-row { margin-top:10px; }
+@media (max-width:520px) { .tabs { grid-template-columns:repeat(5,minmax(0,1fr)); } .tab { font-size:11px; padding:4px 1px; } .form-grid { grid-template-columns:1fr 1fr; } .page-title { align-items:flex-start; flex-direction:column; } }

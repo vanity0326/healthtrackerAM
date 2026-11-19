@@ -196,8 +196,8 @@
   }
   function hasEntry(log) {
     return !!log && (Number.isFinite(log.food) || Number.isFinite(log.move) ||
-      Number.isFinite(log.steps) || log.exerciseLogged === true ||
-      !!(log.sessions && log.sessions.length) || !!log.historicalActivityType);
+      Number.isFinite(log.steps) || Number(log.waterOz) > 0 || !!String(log.notes || "").trim() || log.exerciseLogged === true ||
+      !!(log.sessions && log.sessions.length) || !!log.historicalActivityType || log.restDay === true);
   }
   function daysOf(start) { return Array.from({ length: 7 }, function (_, i) { return addDays(start, i); }); }
   function weekData(start) {
@@ -317,13 +317,43 @@
     const workoutDate = document.createElement("input"); workoutDate.type = "hidden"; workoutDate.name = "date"; workoutDate.value = date;
     workoutForm.appendChild(workoutDate);
     const workoutFields = node("div", "form-grid");
-    workoutFields.append(field("Workout", "name", "", { type: "text", maxlength: 60, placeholder: "e.g., Swim, Elliptical" }));
+    workoutFields.append(field("Workout", "name", "", { type: "text", maxlength: 60, placeholder: "e.g., Pilates reformer" }));
+    workoutFields.append(field("Activity type", "activityType", "other", { select: true, options: [{label:"Pilates",value:"Pilates"},{label:"Walking",value:"Walking"},{label:"Strength",value:"Strength"},{label:"Core",value:"Core"},{label:"Mobility",value:"Mobility"},{label:"Other",value:"other"}] }));
     workoutFields.append(field("Active Calories", "activeCalories", "", { placeholder: "From workout details" }));
+    workoutFields.append(field("Minutes", "minutes", "", { placeholder: "Optional duration" }));
     workoutForm.appendChild(workoutFields);
     const addWorkout = button("Add workout session", "secondary-button"); addWorkout.type = "submit";
     workoutForm.appendChild(addWorkout); workoutCard.appendChild(workoutForm);
     workoutCard.appendChild(node("p", "hint", "Move is the all-day Active Calories total. Exercise is workout-only and kept separate."));
     app.appendChild(workoutCard);
+
+    const waterCard = card("Water", "Record what you drink. Quick-add amounts use your bottle size setting.");
+    const waterTotal = Number(log.waterOz) || 0;
+    const bottle = Number(state.settings.bottleOz) || 16;
+    waterCard.appendChild(node("div", "weekly-total", number(waterTotal) + " oz recorded · " + number(bottle) + " oz bottle"));
+    const waterForm = form("waterForm", "");
+    const waterDate = document.createElement("input"); waterDate.type = "hidden"; waterDate.name = "date"; waterDate.value = date;
+    waterForm.appendChild(waterDate);
+    const waterGrid = node("div", "form-grid");
+    waterGrid.append(field("Amount to add (oz)", "waterAdd", "", { placeholder: "e.g. 8" }));
+    waterForm.appendChild(waterGrid);
+    const waterButtons = node("div", "button-row");
+    const addWater = button("Add amount", "primary-button"); addWater.type = "submit";
+    const addBottle = button("Add bottle", "secondary-button", "add-water-bottle"); addBottle.dataset.date = date;
+    const undoWater = button("Clear water total", "text-button", "clear-water"); undoWater.dataset.date = date;
+    waterButtons.append(addWater, addBottle, undoWater); waterForm.appendChild(waterButtons); waterCard.appendChild(waterForm);
+    app.appendChild(waterCard);
+
+    const notesCard = card("Daily notes & recovery", "Optional observations: energy, sleep, soreness, Pilates, water retention, or a planned rest day.");
+    const notesForm = form("notesForm", "");
+    const notesDate = document.createElement("input"); notesDate.type = "hidden"; notesDate.name = "date"; notesDate.value = date;
+    notesForm.appendChild(notesDate);
+    const notes = document.createElement("textarea"); notes.name = "notes"; notes.rows = 3; notes.maxLength = 2000; notes.placeholder = "A few notes about today…"; notes.value = log.notes || ""; notes.className = "notes-input";
+    notesForm.appendChild(notes);
+    const recovery = node("label", "form-check"); const rest = document.createElement("input"); rest.type = "checkbox"; rest.name = "restDay"; rest.checked = !!log.restDay;
+    recovery.append(rest, node("span", "", "Intentional recovery / rest day")); notesForm.appendChild(recovery);
+    const saveNotes = button("Save notes", "secondary-button"); saveNotes.type = "submit"; notesForm.appendChild(saveNotes);
+    notesCard.appendChild(notesForm); app.appendChild(notesCard);
 
     const pointsCard = card("Logging reward", "One point for your first saved daily entry each calendar day, even when you log yesterday. Missed days never erase points.");
     pointsCard.appendChild(node("div", "big-value", String(state.settings.logPoints.length) + " points"));
@@ -364,9 +394,11 @@
     const prev = button("‹", "date-nav", "shift-week"); prev.dataset.delta = "-1";
     const next = button("›", "date-nav", "shift-week"); next.dataset.delta = "1";
     right.append(prev, node("span", "tag", dateRange(start)), next);
-    app.appendChild(titleBlock("Weekly review", "See weekly totals and the four-week weight trend.", right));
+    const period = field("Review period", "reviewPeriod", state.ui.reviewPeriod || "week", { select: true, options: [{label:"Calendar week",value:"week"},{label:"Last 7 days",value:"7"},{label:"Last 30 days",value:"30"},{label:"This month",value:"month"}] });
+    right.appendChild(period);
+    app.appendChild(titleBlock("Progress review", "Review activity, consistency, water, and body changes without treating missing entries as zero.", right));
     addFlash(app);
-    const c = card("Progress this week", "Review the week without treating missing entries as zero.");
+    const c = card(state.ui.reviewPeriod === "week" ? "Progress this week" : "Calendar-week snapshot", "Calendar-week totals are shown here; the dashboard below follows your selected review period. Missing entries are not zero.");
     reviewMetric(c, "Food", "food", targets.food, "calories", start);
     reviewMetric(c, "Move", "move", targets.move, "calories", start);
     reviewMetric(c, "Exercise · Active Calories", "exercise", targets.exercise, "Active Calories", start);
@@ -401,6 +433,36 @@
       trend.appendChild(node("p", "hint", "Compare with your 2 lb/week aim. Review your logs and decide whether to adjust targets; nothing changes automatically."));
     }
     app.appendChild(trend);
+    const rangeStart = (state.ui.reviewPeriod === "7" || state.ui.reviewPeriod === "30") ? addDays(today(), -(Number(state.ui.reviewPeriod)-1)) : (state.ui.reviewPeriod === "month" ? today().slice(0,7)+"-01" : start);
+    const rangeEnd = state.ui.reviewPeriod === "week" || !state.ui.reviewPeriod ? addDays(start,6) : today();
+    const dates = []; for (let d=rangeStart; d<=rangeEnd; d=addDays(d,1)) dates.push(d);
+    const logs = dates.map(d=>state.logs[d] || {});
+    const sumOf = key => logs.reduce((n,l)=>n+(Number(l[key])||0),0);
+    const exerciseCalories = logs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.activeCalories)||0),0),0);
+    const exerciseMinutes = logs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.minutes)||0),0),0);
+    const exerciseDays = logs.filter(l=>(l.sessions||[]).length>0 || l.exerciseLogged===true).length;
+    const waterDays = logs.filter(l=>Number(l.waterOz)>0).length;
+    const waterTotal = sumOf("waterOz");
+    const dash = card("Progress dashboard", fmt(rangeStart,{month:"short",day:"numeric"})+" – "+fmt(rangeEnd,{month:"short",day:"numeric",year:"numeric"}));
+    const grid = node("div","metrics-grid");
+    [["Exercise days",exerciseDays+" / "+dates.length],["Workout Active Calories",number(exerciseCalories)],["Workout minutes",number(exerciseMinutes)],["Water",number(waterTotal)+" oz"],["Water average",waterDays?number(waterTotal/waterDays,1)+" oz / recorded day":"—"],["Water days",waterDays+" / "+dates.length]].forEach(([k,v])=>{const m=node("div","metric-card");m.append(node("span","metric-name",k),node("span","metric-number",v));grid.appendChild(m);});
+    dash.appendChild(grid); dash.appendChild(node("p","hint","Exercise calories count workout sessions only; Move remains the separate all-day total. Blank days are not counted as zero.")); app.appendChild(dash);
+    const consistency = card("Consistency calendar", "A day is marked when you record any activity, water, notes, a weigh-in, or a measurement. Rest days are recognized, not penalized.");
+    const cal = node("div","day-strip"); dates.slice(-14).forEach(d=>{const l=state.logs[d]||{};const marked=hasEntry(l)||!!state.weighIns[d]||state.measurements.some(m=>m.date===d);const cell=node("div","day-cell "+(marked?"recorded":"empty"));cell.append(node("span","dow",shortDay(d)),node("span","day-value",fmt(d,{month:"numeric",day:"numeric"})));cal.appendChild(cell);}); consistency.appendChild(cal); app.appendChild(consistency);
+    const priorEnd = addDays(rangeStart,-1), spanDays=dates.length, priorStart=addDays(priorEnd,-(spanDays-1));
+    const priorLogs=[]; for(let d=priorStart;d<=priorEnd;d=addDays(d,1)) priorLogs.push(state.logs[d]||{});
+    const priorEx=priorLogs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.activeCalories)||0),0),0);
+    const priorMin=priorLogs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.minutes)||0),0),0);
+    const priorWater=priorLogs.reduce((n,l)=>n+(Number(l.waterOz)||0),0);
+    const compare=card("Period comparison", "Current selected period compared with the immediately preceding period of the same length.");
+    [["Workout Active Calories",exerciseCalories,priorEx],["Workout minutes",exerciseMinutes,priorMin],["Water ounces",waterTotal,priorWater]].forEach(([label,cur,prev])=>{const row=node("div","list-row");row.append(node("span","",label),node("strong","",number(cur)+" vs "+number(prev)+(cur===prev?" · unchanged":cur>prev?" · higher":" · lower")));compare.appendChild(row);});
+    app.appendChild(compare);
+    const milestones=card("Personal milestones", "Highlights from your recorded history. These are observations, not targets or rewards.");
+    const allSessions=Object.values(state.logs).flatMap(l=>l.sessions||[]);
+    const longest=Math.max(0,...allSessions.map(x=>Number(x.minutes)||0));
+    const bestCalories=Math.max(0,...Object.values(state.logs).map(l=>(l.sessions||[]).reduce((a,x)=>a+(Number(x.activeCalories)||0),0)));
+    milestones.append(node("div","list-row","Longest recorded workout: "+number(longest)+" minutes"),node("div","list-row","Highest single-day workout Active Calories: "+number(bestCalories)));
+    app.appendChild(milestones);
     const nextCard = card("Adjusting targets", "Weekly changes start the following Monday. You stay in control of adjustments.");
     nextCard.appendChild(button("Review targets and reminders", "secondary-button", "go-settings"));
     app.appendChild(nextCard);
@@ -767,12 +829,18 @@
     remindersForm.appendChild(node("p", "hint", state.settings.reminder.enabled ? "Reminders are enabled on this device." : "Reminders are currently off."));
     remindersCard.appendChild(remindersForm); app.appendChild(remindersCard);
 
+    const bottleCard = card("Water settings", "Choose the bottle size used by the daily quick-add button.");
+    const bottleForm = form("bottleForm", "");
+    bottleForm.appendChild(field("Bottle size (ounces)", "bottleOz", state.settings.bottleOz || 16, {step:"0.5"}));
+    const bottleSave = button("Save bottle size", "secondary-button"); bottleSave.type="submit"; bottleForm.appendChild(bottleSave);
+    bottleCard.appendChild(bottleForm); app.appendChild(bottleCard);
+
     const summary = state.settings.importSummary || {};
     const range = summary.firstDailyDate ? fmt(summary.firstDailyDate, { month: "short", day: "numeric", year: "numeric" }) + "–" + fmt(summary.lastDailyDate, { month: "short", day: "numeric", year: "numeric" }) : "no daily records";
     const historyCard = card("History and backup", "Imported " + number(summary.dailyRecordDays || 0) + " days with at least one spreadsheet entry (" + range + ") and " + number(summary.weighIns || 0) + " Monday weigh-ins. Missing values stay blank.");
     historyCard.appendChild(node("p", "hint", "Workbook exercise calories were daily totals, so each imported amount stays one dated total rather than a fabricated session breakdown. Imported history does not add reward points."));
     const row = node("div", "button-row");
-    row.append(button("Download backup", "secondary-button", "export-backup"), button("Restore backup", "secondary-button", "open-restore"));
+    row.append(button("Download backup", "secondary-button", "export-backup"), button("Export CSV", "secondary-button", "export-csv"), button("Restore backup", "secondary-button", "open-restore"));
     const restore = document.createElement("input"); restore.type = "file"; restore.accept = "application/json"; restore.id = "restoreFile"; restore.className = "hidden";
     row.appendChild(restore); historyCard.appendChild(row);
     historyCard.appendChild(node("p", "hint", "Workbook history is included automatically. New logs, targets, weigh-ins, and measurements sync through Netlify when online; a local copy keeps the app usable offline."));
@@ -1068,7 +1136,7 @@
     if (!name || raw === "" || !Number.isFinite(Number(raw))) { notify("Enter the workout name and its Active Calories."); return; }
     const log = state.logs[date] || { sessions: [] };
     log.sessions = log.sessions || [];
-    log.sessions.push({ id: randomId(), name: name, activeCalories: Number(raw), source: "manual" });
+    log.sessions.push({ id: randomId(), name: name, activityType: String(f.elements.activityType.value || "other"), minutes: Math.max(0, Number(f.elements.minutes.value) || 0), activeCalories: Number(raw), source: "manual" });
     log.exerciseLogged = true; log.noWorkout = false; state.logs[date] = log;
     awardPoint(); save(); render();
     await syncReminder(today());
@@ -1136,6 +1204,12 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "daily-tracker-backup-" + today() + ".json"; a.click();
     URL.revokeObjectURL(url); notify("Backup downloaded.");
+  }
+  function downloadCSV() {
+    const rows=[["Date","Food Calories","Move Active Calories","Exercise Active Calories","Steps","Water oz","Workout minutes","Workout types","Notes","Rest day"]];
+    Object.keys(state.logs).sort().forEach(date=>{const l=state.logs[date]||{}, sessions=l.sessions||[];rows.push([date,l.food??"",l.move??"",sessions.reduce((a,x)=>a+(Number(x.activeCalories)||0),0),l.steps??"",l.waterOz??"",sessions.reduce((a,x)=>a+(Number(x.minutes)||0),0),sessions.map(x=>x.activityType||x.name||"Workout").join("; "),l.notes||"",l.restDay?"Yes":"No"]);});
+    const csv=rows.map(r=>r.map(v=>{let x=String(v??"");if(/^[=+@\-]/.test(x))x="'"+x;return '"'+x.replace(/"/g,'""')+'"';}).join(",")).join("\r\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=node("a");a.href=url;a.download="tonis-tracker-history-"+today()+".csv";a.click();URL.revokeObjectURL(url);notify("CSV export downloaded.");
   }
   async function restoreBackup(file) {
     try {
@@ -1249,6 +1323,7 @@
     else if (action === "clear-override") { delete state.settings.dailyOverrides[state.ui.overrideDate]; save(); render(); notify("One-day override cleared."); }
     else if (action === "remove-measurement") { state.measurements = state.measurements.filter(function (x) { return x.id !== b.dataset.id; }); save(); render(); notify("Measurement removed."); }
     else if (action === "export-backup") downloadBackup();
+    else if (action === "export-csv") downloadCSV();
     else if (action === "open-restore") document.getElementById("restoreFile").click();
     else if (action === "open-history-import") document.getElementById("historyImportFile").click();
     else if (action === "disable-reminders") await disableReminder();
@@ -1308,6 +1383,11 @@
     state = saved ? JSON.parse(saved) : initialState();
   } catch { state = initialState(); }
   if (!state || state.schemaVersion !== 1) { state = initialState(); hadLocalState = false; }
+  try {
+    if (hadLocalState && !localStorage.getItem("daily-health-tracker-v4-pre-v5-backup")) {
+      const raw = localStorage.getItem(KEY); if (raw) localStorage.setItem("daily-health-tracker-v4-pre-v5-backup", raw);
+    }
+  } catch { /* Existing data remains in place if browser storage is full. */ }
   state.logs = state.logs || {};
   state.weighIns = state.weighIns || {};
   state.measurements = state.measurements || [];
@@ -1318,6 +1398,8 @@
   state.settings.logPoints = state.settings.logPoints || [];
   state.settings.reminder = state.settings.reminder || { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null };
   state.settings.importSummary = state.settings.importSummary || copy(seed.importSummary || {});
+  state.settings.bottleOz = Number(state.settings.bottleOz) || 16;
+  state.ui.reviewPeriod = state.ui.reviewPeriod || "week";
   state.ui = state.ui || {};
   state.ui.view = "today";
   state.ui.selectedDate = addDays(today(), -1);
