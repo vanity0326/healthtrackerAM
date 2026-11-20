@@ -2,4 +2,4 @@ TONI'S TOTAL TRANSFORMATION TRACKER - HEALTH TRACKER VERSION 6.0
 
 Deploy the contents of this Health Tracker package to its existing Netlify site. The package includes the updated latest-reading Weight cards and monthly weight graph. Existing Health Tracker Netlify functions and shared data are included. The Exercise Planner and its PT rotation remain a separate package. This package does not deploy itself or modify hosted records.
 
-Package release: Version 6.0.0. Confirm backups and test on a copy before deploying.
+Package release: Version 6.0.1.1. Confirm backups and test on a copy before deploying.

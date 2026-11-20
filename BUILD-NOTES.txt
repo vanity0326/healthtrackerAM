@@ -1,4 +1,4 @@
-Version 6.0 — consolidated release
+Version 6.0.1 — consolidated release
 
 - Implemented working Add amount, Add bottle, and Clear total actions for fluid tracking.
 - Added beverage categories and stacked flask visualization: water (blue), diet soda (dark brown), tea (light brown), juice (orange), and other beverages (light purple).
@@ -11,4 +11,7 @@ Version 6.0 — consolidated release
 
 Validation: JavaScript syntax check and ZIP integrity check performed. Browser end-to-end interaction testing was not available in this environment; test with a copy of your existing data before deployment.
 
-Release identity: package version 6.0.0; visible app version 6.0; service-worker cache daily-tracker-shell-v6-0-0.
+Release identity: package version 6.0.1; visible app version 6.0; service-worker cache daily-tracker-shell-v6-0-0.
+
+
+Version 6.0.1 update: Fluid tracking has its own date selector, defaulting to the current local date, independent of the daily log date (which defaults to yesterday). Existing entries are not moved.
