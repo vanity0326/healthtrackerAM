@@ -1,6 +1,6 @@
 # TONI'S TOTAL TRANSFORMATION TRACKER
 
-Version 5.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 6.0 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
@@ -69,7 +69,7 @@ The reminder scheduler checks hourly in UTC and sends at the selected local hour
 
 
 
-## Version 5.0 additions
+## Version 6.0 features
 
 - Daily water tracking in ounces, with a configurable bottle-size quick-add and CSV export.
 - Optional daily notes and intentional recovery-day marker.
@@ -79,4 +79,9 @@ The reminder scheduler checks hourly in UTC and sends at the selected local hour
 - Additive local-data upgrade: existing Version 4 records retain the same schema and a one-time pre-upgrade local snapshot is retained in browser storage.
 - Updated service-worker cache and visible app version.
 
-The app continues to use the existing Netlify sync service and local browser storage. No deployment is performed by this package. Backups stored in the same browser/device do not protect against device loss; download the JSON backup periodically and store a copy separately.
+Version 6.0 continues to use the existing Netlify sync service and local browser storage. No deployment is performed by this package. Backups stored in the same browser/device do not protect against device loss; download the JSON backup periodically and store a copy separately.
+
+
+## Version 6.0 fluid tracker and review updates
+
+The fluid tracker supports water, diet soda, tea, juice, and other beverages with a colored flask visualization and working add/clear actions. Daily notes are saved and collected in Review > Notes History. The consistency calendar is the first card on Review. See BUILD-NOTES.txt for validation notes.

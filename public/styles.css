@@ -203,3 +203,15 @@ th:first-child, td:first-child { text-align:left; }
 .notes-input { width:100%; min-height:84px; padding:10px; border:1px solid #CDBE8B; border-radius:10px; background:#fffef9; color:var(--ink); font:inherit; resize:vertical; }
 .button-row { margin-top:10px; }
 @media (max-width:520px) { .tabs { grid-template-columns:repeat(5,minmax(0,1fr)); } .tab { font-size:11px; padding:4px 1px; } .form-grid { grid-template-columns:1fr 1fr; } .page-title { align-items:flex-start; flex-direction:column; } }
+/* V5.0.1 fluid flask and note-history presentation */
+.flask-wrap{display:flex;align-items:center;justify-content:center;gap:22px;margin:14px auto 16px;max-width:420px}
+.fluid-flask{width:128px;height:202px;flex:0 0 128px;overflow:visible}
+.fluid-stats{flex:1;min-width:0}
+.fluid-total{font-size:28px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.fluid-breakdown{display:grid;gap:7px;margin-top:12px}
+.fluid-key{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.fluid-key strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.fluid-swatch{width:11px;height:11px;border-radius:3px;display:inline-block}
+.note-history-row{padding:11px 0;border-top:1px solid var(--border)}
+.note-history-row p{margin:5px 0;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:390px){.flask-wrap{gap:12px}.fluid-flask{width:108px;flex-basis:108px}.fluid-total{font-size:24px}}

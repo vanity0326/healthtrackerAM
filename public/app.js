@@ -327,22 +327,27 @@
     workoutCard.appendChild(node("p", "hint", "Move is the all-day Active Calories total. Exercise is workout-only and kept separate."));
     app.appendChild(workoutCard);
 
-    const waterCard = card("Water", "Record what you drink. Quick-add amounts use your bottle size setting.");
-    const waterTotal = Number(log.waterOz) || 0;
+    const waterCard = card("Fluids", "Log water and other drinks. The flask fills with colored layers to show your combined fluid intake.");
     const bottle = Number(state.settings.bottleOz) || 16;
-    waterCard.appendChild(node("div", "weekly-total", number(waterTotal) + " oz recorded · " + number(bottle) + " oz bottle"));
-    const waterForm = form("waterForm", "");
-    const waterDate = document.createElement("input"); waterDate.type = "hidden"; waterDate.name = "date"; waterDate.value = date;
-    waterForm.appendChild(waterDate);
-    const waterGrid = node("div", "form-grid");
-    waterGrid.append(field("Amount to add (oz)", "waterAdd", "", { placeholder: "e.g. 8" }));
-    waterForm.appendChild(waterGrid);
-    const waterButtons = node("div", "button-row");
-    const addWater = button("Add amount", "primary-button"); addWater.type = "submit";
-    const addBottle = button("Add bottle", "secondary-button", "add-water-bottle"); addBottle.dataset.date = date;
-    const undoWater = button("Clear water total", "text-button", "clear-water"); undoWater.dataset.date = date;
-    waterButtons.append(addWater, addBottle, undoWater); waterForm.appendChild(waterButtons); waterCard.appendChild(waterForm);
-    app.appendChild(waterCard);
+    const beverageDefs = [{key:"water",label:"Water",color:"#45B8E8"},{key:"dietSoda",label:"Diet soda",color:"#70432F"},{key:"tea",label:"Tea",color:"#C99554"},{key:"juice",label:"Juice",color:"#F59A23"},{key:"other",label:"Other beverages",color:"#C5A0E8"}];
+    const bev = Object.assign({water:0,dietSoda:0,tea:0,juice:0,other:0}, log.beverages || {});
+    if (!log.beverages && Number(log.waterOz)>0) bev.water=Number(log.waterOz);
+    const fluidTotal = beverageDefs.reduce((n,x)=>n+(Number(bev[x.key])||0),0);
+    const goal = Number(state.settings.fluidGoalOz) || 64;
+    const flaskWrap = node("div","flask-wrap");
+    const flask = document.createElementNS("http://www.w3.org/2000/svg","svg"); flask.setAttribute("viewBox","0 0 140 220"); flask.setAttribute("class","fluid-flask"); flask.setAttribute("role","img"); flask.setAttribute("aria-label",number(fluidTotal)+" ounces of fluids recorded");
+    const defs=document.createElementNS(flask.namespaceURI,"defs"), clip=document.createElementNS(flask.namespaceURI,"clipPath"); clip.setAttribute("id","fluidFlaskClip"); const clipRect=document.createElementNS(flask.namespaceURI,"rect"); clipRect.setAttribute("x","36");clipRect.setAttribute("y","49");clipRect.setAttribute("width","68");clipRect.setAttribute("height","150");clipRect.setAttribute("rx","18");clip.appendChild(clipRect);defs.appendChild(clip);flask.appendChild(defs);
+    const cap=document.createElementNS(flask.namespaceURI,"rect");cap.setAttribute("x","52");cap.setAttribute("y","20");cap.setAttribute("width","36");cap.setAttribute("height","17");cap.setAttribute("rx","4");cap.setAttribute("fill","#91A8B8");flask.appendChild(cap);
+    const neck=document.createElementNS(flask.namespaceURI,"rect");neck.setAttribute("x","47");neck.setAttribute("y","34");neck.setAttribute("width","46");neck.setAttribute("height","15");neck.setAttribute("rx","5");neck.setAttribute("fill","#91A8B8");flask.appendChild(neck);
+    const layers=document.createElementNS(flask.namespaceURI,"g");layers.setAttribute("clip-path","url(#fluidFlaskClip)");let bottom=199;
+    beverageDefs.forEach(def=>{const amount=Number(bev[def.key])||0;if(amount<=0)return;const h=Math.min(150,amount/Math.max(goal,fluidTotal,1)*150);const r=document.createElementNS(flask.namespaceURI,"rect");r.setAttribute("x","36");r.setAttribute("y",String(bottom-h));r.setAttribute("width","68");r.setAttribute("height",String(h+1));r.setAttribute("fill",def.color);layers.appendChild(r);bottom-=h;});flask.appendChild(layers);
+    const outline=document.createElementNS(flask.namespaceURI,"rect");outline.setAttribute("x","36");outline.setAttribute("y","47");outline.setAttribute("width","68");outline.setAttribute("height","154");outline.setAttribute("rx","20");outline.setAttribute("fill","none");outline.setAttribute("stroke","#668DA5");outline.setAttribute("stroke-width","4");flask.appendChild(outline);
+    flaskWrap.append(flask); const fluidStats=node("div","fluid-stats");fluidStats.append(node("div","fluid-total",number(fluidTotal)+" oz"),node("div","hint",number(Math.round(fluidTotal/goal*100))+"% of "+number(goal)+" oz daily reference"));
+    const breakdown=node("div","fluid-breakdown");beverageDefs.forEach(def=>{const line=node("div","fluid-key");const swatch=node("span","fluid-swatch");swatch.style.background=def.color;line.append(swatch,node("span","",def.label),node("strong","",number(bev[def.key])+" oz"));breakdown.appendChild(line);});fluidStats.appendChild(breakdown);flaskWrap.appendChild(fluidStats);waterCard.appendChild(flaskWrap);
+    const waterForm=form("waterForm","");const waterDate=document.createElement("input");waterDate.type="hidden";waterDate.name="date";waterDate.value=date;waterForm.appendChild(waterDate);
+    const waterGrid=node("div","form-grid");waterGrid.append(field("Beverage","beverageType","water",{select:true,options:beverageDefs.map(x=>({label:x.label,value:x.key}))}));waterGrid.append(field("Amount (oz)","waterAdd","",{placeholder:"e.g. 8"}));waterForm.appendChild(waterGrid);
+    const waterButtons=node("div","button-row");const addWater=button("Add amount","primary-button");addWater.type="submit";const addBottle=button("Add bottle","secondary-button","add-water-bottle");addBottle.dataset.date=date;const clearFluids=button("Clear total","text-button","clear-water");clearFluids.dataset.date=date;waterButtons.append(addWater,addBottle,clearFluids);waterForm.appendChild(waterButtons);waterCard.appendChild(waterForm);
+    waterCard.appendChild(node("p","hint","Add bottle records your configured bottle size for the selected beverage. Clear total removes all beverage entries for this date."));app.appendChild(waterCard);
 
     const notesCard = card("Daily notes & recovery", "Optional observations: energy, sleep, soreness, Pilates, water retention, or a planned rest day.");
     const notesForm = form("notesForm", "");
@@ -398,6 +403,11 @@
     right.appendChild(period);
     app.appendChild(titleBlock("Progress review", "Review activity, consistency, water, and body changes without treating missing entries as zero.", right));
     addFlash(app);
+    const rangeStart = (state.ui.reviewPeriod === "7" || state.ui.reviewPeriod === "30") ? addDays(today(), -(Number(state.ui.reviewPeriod)-1)) : (state.ui.reviewPeriod === "month" ? today().slice(0,7)+"-01" : start);
+    const rangeEnd = state.ui.reviewPeriod === "week" || !state.ui.reviewPeriod ? addDays(start,6) : today();
+    const dates = []; for (let d=rangeStart; d<=rangeEnd; d=addDays(d,1)) dates.push(d);
+    const consistency = card("Consistency calendar", "Your recorded days across activity, fluids, notes, weigh-ins, and measurements. Rest days are recognized, not penalized.");
+    const cal = node("div","day-strip"); dates.slice(-35).forEach(d=>{const l=state.logs[d]||{};const marked=hasEntry(l)||!!state.weighIns[d]||state.measurements.some(m=>m.date===d);const cell=button(fmt(d,{month:"numeric",day:"numeric"}),"day-cell "+(marked?"recorded":"empty"),"edit-date");cell.dataset.date=d;cell.appendChild(node("span","dow",shortDay(d)));cal.appendChild(cell);}); consistency.appendChild(cal);app.appendChild(consistency);
     const c = card(state.ui.reviewPeriod === "week" ? "Progress this week" : "Calendar-week snapshot", "Calendar-week totals are shown here; the dashboard below follows your selected review period. Missing entries are not zero.");
     reviewMetric(c, "Food", "food", targets.food, "calories", start);
     reviewMetric(c, "Move", "move", targets.move, "calories", start);
@@ -433,30 +443,31 @@
       trend.appendChild(node("p", "hint", "Compare with your 2 lb/week aim. Review your logs and decide whether to adjust targets; nothing changes automatically."));
     }
     app.appendChild(trend);
-    const rangeStart = (state.ui.reviewPeriod === "7" || state.ui.reviewPeriod === "30") ? addDays(today(), -(Number(state.ui.reviewPeriod)-1)) : (state.ui.reviewPeriod === "month" ? today().slice(0,7)+"-01" : start);
-    const rangeEnd = state.ui.reviewPeriod === "week" || !state.ui.reviewPeriod ? addDays(start,6) : today();
-    const dates = []; for (let d=rangeStart; d<=rangeEnd; d=addDays(d,1)) dates.push(d);
     const logs = dates.map(d=>state.logs[d] || {});
     const sumOf = key => logs.reduce((n,l)=>n+(Number(l[key])||0),0);
     const exerciseCalories = logs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.activeCalories)||0),0),0);
     const exerciseMinutes = logs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.minutes)||0),0),0);
     const exerciseDays = logs.filter(l=>(l.sessions||[]).length>0 || l.exerciseLogged===true).length;
-    const waterDays = logs.filter(l=>Number(l.waterOz)>0).length;
-    const waterTotal = sumOf("waterOz");
+    const waterAmount = l => l.beverages ? Object.values(l.beverages).reduce((n,v)=>n+(Number(v)||0),0) : (Number(l.waterOz)||0);
+    const waterDays = logs.filter(l=>waterAmount(l)>0).length;
+    const waterTotal = logs.reduce((n,l)=>n+waterAmount(l),0);
     const dash = card("Progress dashboard", fmt(rangeStart,{month:"short",day:"numeric"})+" – "+fmt(rangeEnd,{month:"short",day:"numeric",year:"numeric"}));
     const grid = node("div","metrics-grid");
     [["Exercise days",exerciseDays+" / "+dates.length],["Workout Active Calories",number(exerciseCalories)],["Workout minutes",number(exerciseMinutes)],["Water",number(waterTotal)+" oz"],["Water average",waterDays?number(waterTotal/waterDays,1)+" oz / recorded day":"—"],["Water days",waterDays+" / "+dates.length]].forEach(([k,v])=>{const m=node("div","metric-card");m.append(node("span","metric-name",k),node("span","metric-number",v));grid.appendChild(m);});
     dash.appendChild(grid); dash.appendChild(node("p","hint","Exercise calories count workout sessions only; Move remains the separate all-day total. Blank days are not counted as zero.")); app.appendChild(dash);
-    const consistency = card("Consistency calendar", "A day is marked when you record any activity, water, notes, a weigh-in, or a measurement. Rest days are recognized, not penalized.");
-    const cal = node("div","day-strip"); dates.slice(-14).forEach(d=>{const l=state.logs[d]||{};const marked=hasEntry(l)||!!state.weighIns[d]||state.measurements.some(m=>m.date===d);const cell=node("div","day-cell "+(marked?"recorded":"empty"));cell.append(node("span","dow",shortDay(d)),node("span","day-value",fmt(d,{month:"numeric",day:"numeric"})));cal.appendChild(cell);}); consistency.appendChild(cal); app.appendChild(consistency);
     const priorEnd = addDays(rangeStart,-1), spanDays=dates.length, priorStart=addDays(priorEnd,-(spanDays-1));
     const priorLogs=[]; for(let d=priorStart;d<=priorEnd;d=addDays(d,1)) priorLogs.push(state.logs[d]||{});
     const priorEx=priorLogs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.activeCalories)||0),0),0);
     const priorMin=priorLogs.reduce((n,l)=>n+(l.sessions||[]).reduce((a,x)=>a+(Number(x.minutes)||0),0),0);
-    const priorWater=priorLogs.reduce((n,l)=>n+(Number(l.waterOz)||0),0);
+    const priorWater=priorLogs.reduce((n,l)=>n+(l.beverages?Object.values(l.beverages).reduce((a,v)=>a+(Number(v)||0),0):(Number(l.waterOz)||0)),0);
     const compare=card("Period comparison", "Current selected period compared with the immediately preceding period of the same length.");
     [["Workout Active Calories",exerciseCalories,priorEx],["Workout minutes",exerciseMinutes,priorMin],["Water ounces",waterTotal,priorWater]].forEach(([label,cur,prev])=>{const row=node("div","list-row");row.append(node("span","",label),node("strong","",number(cur)+" vs "+number(prev)+(cur===prev?" · unchanged":cur>prev?" · higher":" · lower")));compare.appendChild(row);});
     app.appendChild(compare);
+    const notesHistory=card("Notes history", "Your saved daily observations, newest first.");
+    const noteDays=Object.keys(state.logs).filter(d=>String(state.logs[d].notes||"").trim()).sort().reverse();
+    if(!noteDays.length) notesHistory.appendChild(empty("No saved notes yet."));
+    noteDays.slice(0,30).forEach(d=>{const row=node("div","note-history-row");row.append(node("strong","",fmt(d,{weekday:"short",month:"short",day:"numeric",year:"numeric"})),node("p","",state.logs[d].notes));const edit=button("Open day","text-button","edit-date");edit.dataset.date=d;row.appendChild(edit);notesHistory.appendChild(row);});
+    app.appendChild(notesHistory);
     const milestones=card("Personal milestones", "Highlights from your recorded history. These are observations, not targets or rewards.");
     const allSessions=Object.values(state.logs).flatMap(l=>l.sessions||[]);
     const longest=Math.max(0,...allSessions.map(x=>Number(x.minutes)||0));
@@ -833,6 +844,7 @@
     const bottleForm = form("bottleForm", "");
     bottleForm.appendChild(field("Bottle size (ounces)", "bottleOz", state.settings.bottleOz || 16, {step:"0.5"}));
     const bottleSave = button("Save bottle size", "secondary-button"); bottleSave.type="submit"; bottleForm.appendChild(bottleSave);
+    bottleForm.appendChild(field("Daily fluid reference (oz)","fluidGoalOz",state.settings.fluidGoalOz||64,{step:"1"}));
     bottleCard.appendChild(bottleForm); app.appendChild(bottleCard);
 
     const summary = state.settings.importSummary || {};
@@ -1111,6 +1123,14 @@
     } catch { /* An offline entry remains saved locally. */ }
   }
 
+  function addFluid(date, beverage, amount) {
+    const allowed=["water","dietSoda","tea","juice","other"];
+    if(!allowed.includes(beverage)||!Number.isFinite(amount)||amount<=0){notify("Choose a beverage and enter a positive amount.");return;}
+    const log=state.logs[date]||{sessions:[]};const legacyWater=!log.beverages?(Number(log.waterOz)||0):0;log.beverages=Object.assign({water:legacyWater,dietSoda:0,tea:0,juice:0,other:0},log.beverages||{});
+    log.beverages[beverage]=(Number(log.beverages[beverage])||0)+amount;
+    log.waterOz=Object.values(log.beverages).reduce((n,v)=>n+(Number(v)||0),0);
+    state.logs[date]=log;awardPoint();save();render();notify(number(amount)+" oz added to "+({water:"water",dietSoda:"diet soda",tea:"tea",juice:"juice",other:"other beverages"}[beverage])+".");
+  }
   async function submitDaily(f) {
     const date = f.elements.date.value;
     const current = state.logs[date] || { sessions: [] };
@@ -1305,7 +1325,9 @@
     const b = event.target.closest("[data-action]");
     if (!b) return;
     const action = b.dataset.action;
-    if (action === "jump-today") { state.ui.selectedDate = today(); save(); render(); }
+    if (action === "add-water-bottle") { addFluid(b.dataset.date, document.querySelector('#waterForm [name="beverageType"]')?.value || "water", Number(state.settings.bottleOz)||16); }
+    else if (action === "clear-water") { const date=b.dataset.date; if (window.confirm("Clear all beverage entries for this date?")) { const log=state.logs[date]; if(log){delete log.beverages;delete log.waterOz;if(!hasEntry(log))delete state.logs[date];}save();render();notify("Fluid total cleared for this date."); } }
+    else if (action === "jump-today") { state.ui.selectedDate = today(); save(); render(); }
     else if (action === "open-measurement-type") { state.ui.measurementTypeFormOpen = true; state.ui.measurementFormOpen = false; save(); render(); }
     else if (action === "cancel-measurement-type") { state.ui.measurementTypeFormOpen = false; save(); render(); }
     else if (action === "cancel-measurement-entry") { state.ui.measurementFormOpen = false; save(); render(); }
@@ -1346,12 +1368,15 @@
     if (!(f instanceof HTMLFormElement)) return;
     event.preventDefault();
     if (f.id === "dailyForm") await submitDaily(f);
+    else if (f.id === "waterForm") { const amount=Number(f.elements.waterAdd.value); if(!Number.isFinite(amount)||amount<=0){notify("Enter an amount greater than zero.");return;} addFluid(f.elements.date.value,f.elements.beverageType.value,amount); }
+    else if (f.id === "notesForm") { const date=f.elements.date.value;const log=state.logs[date]||{sessions:[]};log.notes=f.elements.notes.value.trim();log.restDay=!!f.elements.restDay.checked;if(!log.notes&&!log.restDay&&!hasEntry(log))delete state.logs[date];else state.logs[date]=log;awardPoint();save();render();notify("Daily note saved."); }
     else if (f.id === "workoutForm") await submitWorkout(f);
     else if (f.id === "weightForm") submitWeight(f);
     else if (f.id === "measurementForm") submitMeasurement(f);
     else if (f.id === "measurementTypeForm") submitMeasurementType(f);
     else if (f.id === "weeklyTargetsForm") submitTargets(f);
     else if (f.id === "dailyOverrideForm") submitOverride(f);
+    else if (f.id === "bottleForm") { const size=Number(f.elements.bottleOz.value),goal=Number(f.elements.fluidGoalOz.value);if(!Number.isFinite(size)||size<=0||!Number.isFinite(goal)||goal<=0){notify("Enter positive bottle and daily fluid amounts.");return;}state.settings.bottleOz=size;state.settings.fluidGoalOz=goal;save();render();notify("Fluid settings saved."); }
     else if (f.id === "reminderForm") await enableReminder(f);
   });
 
@@ -1399,6 +1424,7 @@
   state.settings.reminder = state.settings.reminder || { enabled: false, time: "09:00", apiKey: "", userId: randomId(), lastLogDate: null };
   state.settings.importSummary = state.settings.importSummary || copy(seed.importSummary || {});
   state.settings.bottleOz = Number(state.settings.bottleOz) || 16;
+  state.settings.fluidGoalOz = Number(state.settings.fluidGoalOz) || 64;
   state.ui.reviewPeriod = state.ui.reviewPeriod || "week";
   state.ui = state.ui || {};
   state.ui.view = "today";

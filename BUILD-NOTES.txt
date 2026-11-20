@@ -1,18 +1,14 @@
-TONI'S TOTAL TRANSFORMATION TRACKER — VERSION 5.0
+Version 6.0 — consolidated release
 
-Build summary
-- Preserves the Version 4 schema (schemaVersion 1) so existing records remain readable by the existing Netlify data function.
-- Makes a one-time local pre-V5 snapshot before adding new optional fields.
-- Adds water ounces and configurable bottle quick-add, daily notes, recovery-day marker, workout category and minutes, CSV export, review-period selection, progress dashboard, consistency calendar, adjacent-period comparisons, and personal-record observations.
-- Keeps Move (all-day Active Calories) separate from workout-session Active Calories. Weekly Exercise review totals the Active Calories from session records only.
-- Retains existing JSON backup/restore, measurement, weigh-in, targets, reminders, history import, and sync workflows.
+- Implemented working Add amount, Add bottle, and Clear total actions for fluid tracking.
+- Added beverage categories and stacked flask visualization: water (blue), diet soda (dark brown), tea (light brown), juice (orange), and other beverages (light purple).
+- Fluid amount and bottle size are recorded in ounces; bottle size and daily reference amount are configurable in More > Water settings.
+- Legacy V5 waterOz entries are preserved and carried forward as water when a new beverage is added.
+- Added daily notes save handling and Notes History to Progress Review.
+- Moved the consistency calendar to the first metric/card on Progress Review; dates can be opened for editing.
+- Clear total confirms before removing the selected date's beverage entries. Other daily records remain intact.
+- Live Netlify deployment is not modified by this source package.
 
-Validation
-- JavaScript syntax checked with Node.js.
-- Static source/package/service-worker consistency checked.
-- No live deployment or Netlify data modification performed.
-- Browser end-to-end tests were not available in this build environment; review on a copy before deploying.
+Validation: JavaScript syntax check and ZIP integrity check performed. Browser end-to-end interaction testing was not available in this environment; test with a copy of your existing data before deployment.
 
-Data safety
-- Existing local V4 state is not intentionally reset or rewritten into a new schema. A one-time browser-local snapshot is created before additive defaults are applied.
-- Continue downloading JSON backups to a separate device/drive; a browser-local snapshot is not protection against device loss.
+Release identity: package version 6.0.0; visible app version 6.0; service-worker cache daily-tracker-shell-v6-0-0.
