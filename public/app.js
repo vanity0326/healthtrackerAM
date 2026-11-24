@@ -306,7 +306,10 @@
       sessions.forEach(function (session) {
         const row = node("div", "session-row");
         const details = node("div");
-        details.append(node("strong", "", session.name || "Workout"), node("small", "", number(session.activeCalories) + " Active Calories" + (session.source === "spreadsheet" ? " · imported daily total" : "")));
+        const activityLabel = session.activityType === "Cardio" && session.cardioActivity
+          ? "Cardio · " + session.cardioActivity
+          : session.activityType && session.activityType !== "other" ? session.activityType : "";
+        details.append(node("strong", "", session.name || "Workout"), node("small", "", (activityLabel ? activityLabel + " · " : "") + number(session.activeCalories) + " Active Calories" + (session.source === "spreadsheet" ? " · imported daily total" : "")));
         const remove = button("Remove", "remove", "remove-session");
         remove.dataset.id = session.id; remove.dataset.date = date;
         row.append(details, remove); list.appendChild(row);
@@ -317,8 +320,16 @@
     const workoutDate = document.createElement("input"); workoutDate.type = "hidden"; workoutDate.name = "date"; workoutDate.value = date;
     workoutForm.appendChild(workoutDate);
     const workoutFields = node("div", "form-grid");
-    workoutFields.append(field("Workout", "name", "", { type: "text", maxlength: 60, placeholder: "e.g., Pilates reformer" }));
-    workoutFields.append(field("Activity type", "activityType", "other", { select: true, options: [{label:"Pilates",value:"Pilates"},{label:"Walking",value:"Walking"},{label:"Strength",value:"Strength"},{label:"Core",value:"Core"},{label:"Mobility",value:"Mobility"},{label:"Other",value:"other"}] }));
+    workoutFields.append(field("Workout name", "name", "", { type: "text", maxlength: 60, placeholder: "e.g., Pilates reformer (optional for Cardio)" }));
+    const activityTypeField = field("Activity type", "activityType", "other", { select: true, options: [{label:"Pilates",value:"Pilates"},{label:"Walking",value:"Walking"},{label:"Strength",value:"Strength"},{label:"Core",value:"Core"},{label:"Mobility",value:"Mobility"},{label:"Cardio",value:"Cardio"},{label:"Other",value:"other"}] });
+    const cardioActivityField = field("Cardio activity", "cardioActivity", "", { select: true, options: [{label:"Choose an activity",value:""},{label:"Swimming",value:"Swimming"},{label:"Elliptical",value:"Elliptical"},{label:"Recumbent Bike",value:"Recumbent Bike"}] });
+    cardioActivityField.hidden = true;
+    activityTypeField.querySelector("select").addEventListener("change", function () {
+      const isCardio = this.value === "Cardio";
+      cardioActivityField.hidden = !isCardio;
+      cardioActivityField.querySelector("select").required = isCardio;
+    });
+    workoutFields.append(activityTypeField, cardioActivityField);
     workoutFields.append(field("Active Calories", "activeCalories", "", { placeholder: "From workout details" }));
     workoutFields.append(field("Minutes", "minutes", "", { placeholder: "Optional duration" }));
     workoutForm.appendChild(workoutFields);
@@ -1157,12 +1168,15 @@
   }
   async function submitWorkout(f) {
     const date = f.elements.date.value;
-    const name = f.elements.name.value.trim();
+    const activityType = String(f.elements.activityType.value || "other");
+    const cardioActivity = activityType === "Cardio" ? String(f.elements.cardioActivity.value || "") : "";
+    const name = f.elements.name.value.trim() || (activityType === "Cardio" ? cardioActivity : "");
     const raw = String(f.elements.activeCalories.value).trim();
+    if (activityType === "Cardio" && !cardioActivity) { notify("Choose Swimming, Elliptical, or Recumbent Bike for this Cardio session."); return; }
     if (!name || raw === "" || !Number.isFinite(Number(raw))) { notify("Enter the workout name and its Active Calories."); return; }
     const log = state.logs[date] || { sessions: [] };
     log.sessions = log.sessions || [];
-    log.sessions.push({ id: randomId(), name: name, activityType: String(f.elements.activityType.value || "other"), minutes: Math.max(0, Number(f.elements.minutes.value) || 0), activeCalories: Number(raw), source: "manual" });
+    log.sessions.push({ id: randomId(), name: name, activityType: activityType, cardioActivity: cardioActivity || undefined, minutes: Math.max(0, Number(f.elements.minutes.value) || 0), activeCalories: Number(raw), source: "manual" });
     log.exerciseLogged = true; log.noWorkout = false; state.logs[date] = log;
     awardPoint(); save(); render();
     await syncReminder(today());
@@ -1233,7 +1247,7 @@
   }
   function downloadCSV() {
     const rows=[["Date","Food Calories","Move Active Calories","Exercise Active Calories","Steps","Water oz","Workout minutes","Workout types","Notes","Rest day"]];
-    Object.keys(state.logs).sort().forEach(date=>{const l=state.logs[date]||{}, sessions=l.sessions||[];rows.push([date,l.food??"",l.move??"",sessions.reduce((a,x)=>a+(Number(x.activeCalories)||0),0),l.steps??"",l.waterOz??"",sessions.reduce((a,x)=>a+(Number(x.minutes)||0),0),sessions.map(x=>x.activityType||x.name||"Workout").join("; "),l.notes||"",l.restDay?"Yes":"No"]);});
+    Object.keys(state.logs).sort().forEach(date=>{const l=state.logs[date]||{}, sessions=l.sessions||[];rows.push([date,l.food??"",l.move??"",sessions.reduce((a,x)=>a+(Number(x.activeCalories)||0),0),l.steps??"",l.waterOz??"",sessions.reduce((a,x)=>a+(Number(x.minutes)||0),0),sessions.map(x=>x.activityType==="Cardio"&&x.cardioActivity?"Cardio · "+x.cardioActivity:x.activityType||x.name||"Workout").join("; "),l.notes||"",l.restDay?"Yes":"No"]);});
     const csv=rows.map(r=>r.map(v=>{let x=String(v??"");if(/^[=+@\-]/.test(x))x="'"+x;return '"'+x.replace(/"/g,'""')+'"';}).join(",")).join("\r\n");
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=node("a");a.href=url;a.download="tonis-tracker-history-"+today()+".csv";a.click();URL.revokeObjectURL(url);notify("CSV export downloaded.");
   }

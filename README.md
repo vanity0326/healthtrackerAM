@@ -1,12 +1,13 @@
 # TONI'S TOTAL TRANSFORMATION TRACKER
 
-Version 6.0.1 of the daily log and weekly review app, with automatic workbook history, offline local copies, and cross-device syncing through Netlify Blobs. It is designed to sit alongside the separate exercise planner.
+Version 7.0.0 of the daily log and weekly review app, based on Health Tracker 6.0.1. It retains the existing workbook history, offline local copies, and cross-device syncing through Netlify Blobs, and adds Cardio session logging. It is designed to sit alongside the separate exercise planner.
 
 ## What it includes
 
 - Daily food range of 1,500–1,700 calories with an 11,900-calorie weekly target; low and high readings are both marked amber. The range follows the scheduled daily food guide with a 200-calorie lower band.
 - All-day Move Active Calories, workout-only Active Calories, and steps.
 - Multiple workout sessions per day, with their Active Calories summed.
+- Cardio exercise category with Swimming, Elliptical, and Recumbent Bike activities.
 - Weekly review totals without repeating the daily table; missing values stay blank. Food review also shows the average and how many logged days fell within the target range.
 - Monday Withings weigh-ins: weight, fat mass %, lean mass %, BMI, and muscle mass %.
 - A four-week weight trend and a reminder to review your records before choosing whether to adjust targets.
@@ -85,3 +86,7 @@ Version 6.0.1 continues to use the existing Netlify sync service and local brows
 ## Version 6.0.1 fluid tracker and review updates
 
 The fluid tracker supports water, diet soda, tea, juice, and other beverages with a colored flask visualization and working add/clear actions. Daily notes are saved and collected in Review > Notes History. The consistency calendar is the first card on Review. See BUILD-NOTES.txt for validation notes.
+
+## Version 7.0.0 exercise update
+
+Cardio is available as an exercise activity type. Choose Swimming, Elliptical, or Recumbent Bike for a Cardio session. The subtype is saved with the existing workout session record and appears in session details and CSV exports. Existing sessions, historical records, synchronization, and the separate Exercise Planner remain unchanged.

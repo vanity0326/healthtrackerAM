@@ -111,6 +111,7 @@ button.day-cell { cursor:pointer; }
 .date-nav { border:1px solid var(--border); border-radius:10px; background:var(--surface); min-height:42px; padding:8px 12px; cursor:pointer; }
 .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .field { display:grid; gap:5px; min-width:0; }
+.field[hidden] { display:none; }
 .field label { color:var(--muted); font-size:12px; font-weight:650; }
 .field input, .field select {
   width:100%; min-height:43px; padding:9px 10px; border:1px solid #CDBE8B; border-radius:10px;

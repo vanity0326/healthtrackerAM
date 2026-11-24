@@ -1,3 +1,13 @@
+Version 7.0.0 — source changes prepared; build on hold
+
+- Based on the supplied Health Tracker 6.0.1 source package (deployment notes referenced 6.0.1.1).
+- Added Cardio to the Health Tracker exercise activity types.
+- Cardio sessions can be categorized as Swimming, Elliptical, or Recumbent Bike.
+- Saved the Cardio subtype with the existing session record; included it in session details and CSV export.
+- Kept the existing log, history, backup, and sync structures in place; no historical records are migrated or rewritten.
+- Kept the Exercise Planner and its PT rotation out of scope.
+- Build status: on hold. No build, tests, ZIP packaging, or deployment performed for this change.
+
 Version 6.0.1 — consolidated release
 
 - Implemented working Add amount, Add bottle, and Clear total actions for fluid tracking.
